@@ -89,7 +89,7 @@ No VirtualBox DHCP on lab networks. Static addresses keep alert identities stabl
 | DC01 | 10.10.10.10 | Samba AD + DNS, phase 2. Domain `corp.lab`, NetBIOS `CORP` |
 | WIN01 | 10.10.10.20 | Endpoint |
 | SRV01 | 10.10.10.30 | Reserved, not built |
-| NDR01 nic0 | 10.10.10.40 | Suricata sensor. Passive promiscuous first; inline bridge on gate G2 failure, phase 3 |
+| NDR01 nic0 | 10.10.10.40 | Suricata sensor, phase 3. Passive promiscuous first. On gate G2 failure it binds the `br0` bridge pair instead — an active forwarding path, not a mirror; see section 12 G2 |
 
 Phase 1 agents use `10.10.10.5` directly. DNS is not a phase-1 dependency.
 
@@ -127,7 +127,7 @@ On a 5 GB guest the indexer heap is capped:
 - Single-node, zero replicas
 - Index lifecycle: delete indices older than 7 days
 - Alert archive: 30 days or 5 GB, whichever comes first
-- If the indexer OOMs during phase-1 tuning, run `sudo systemctl stop wazuh-dashboard` inside SOC01 for the ingestion test. That frees 0.8–1 GB of guest RAM. The host browser does not free guest RAM. Restart it with `sudo systemctl start wazuh-dashboard` after the test
+- If the indexer OOMs during phase-1 tuning, run `sudo systemctl stop wazuh-dashboard` inside SOC01 for the ingestion test. That frees 0.8–1 GB of guest RAM. The host browser does not free guest RAM. Restart it with `sudo systemctl start wazuh-dashboard` after the test. While stopped, `https://10.10.30.10` from the host browser throws a connection error — expected, not a crash. Ingestion verification continues headless via the API/CLI checks in section 12 G1
 
 Do not raise SOC01 to 6 GB while WIN01 and a third guest are on. 6 GB is allowed only for a phase-1 solo tuning window: SOC01 6 GB + WIN01 4 GB = 10 GB, third guests off.
 
@@ -322,7 +322,9 @@ If it does not, the default re-plumb is the inline bridge model:
 1. Split `int-corp` into `int-corp-east` (WIN01, DC01) and `int-corp-west` (SOC01)
 2. NDR01 gets one NIC on each segment and bridges them (`ip link add br0 type bridge`, enslave both NICs, up)
 3. All hosts keep their existing `10.10.10.0/24` addresses. No renumbering, so phases 1–2 keep working
-4. Suricata binds `br0`. All WIN01-to-SOC01 traffic now transits the sensor deterministically
+4. Suricata binds `br0` in AF_PACKET IDS mode, not NFQUEUE. The kernel bridge does the forwarding; Suricata observes from the bridge device. All WIN01-to-SOC01 traffic now transits the sensor deterministically
+
+Bridge-model caveats to document in the runbook: the sensor is now in the forwarding path, so a stopped NDR01 stops traffic between the segments, and Suricata restarts must keep `br0` up. Keep S3 power-on discipline (NDR01 on before WIN01 runs its test, off last)
 
 Second fallback, routed model, only if bridging fails:
 
