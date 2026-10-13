@@ -89,7 +89,7 @@ No VirtualBox DHCP on lab networks. Static addresses keep alert identities stabl
 | DC01 | 10.10.10.10 | Samba AD + DNS, phase 2. Domain `corp.lab`, NetBIOS `CORP` |
 | WIN01 | 10.10.10.20 | Endpoint |
 | SRV01 | 10.10.10.30 | Reserved, not built |
-| NDR01 nic0 | 10.10.10.40 | Suricata, promiscuous mode Allow All, phase 3 |
+| NDR01 nic0 | 10.10.10.40 | Suricata sensor. Passive promiscuous first; inline bridge on gate G2 failure, phase 3 |
 
 Phase 1 agents use `10.10.10.5` directly. DNS is not a phase-1 dependency.
 
@@ -98,10 +98,10 @@ Phase 1 agents use `10.10.10.5` directly. DNS is not a phase-1 dependency.
 - SOC01: host-only + `int-corp` + NAT (detached after install)
 - WIN01: `int-corp` + NAT (detached after install)
 - DC01: `int-corp` + NAT (detached after install)
-- NDR01: `int-corp` only, promiscuous Allow All. Install packages by temporary NAT, then remove that NIC or leave it disconnected
+- NDR01: `int-corp`, promiscuous Allow All. Install packages by temporary NAT, then remove that NIC or leave it disconnected. If gate G2 fails, it gains a second NIC on `int-corp-west` for the bridge model
 - SOAR01: host-only + temporary NAT
 
-Promiscuous mode is set on NDR01's `int-corp` adapter to Allow All. Verification gate for phase 3: `tcpdump` on NDR01 must see a WIN01-to-SOC01 flow before Suricata rules are trusted. If that capture fails, fallback is inline: WIN01 default gateway becomes NDR01, NDR01 forwards to SOC01. Do not start with the inline design.
+Promiscuous mode is set on NDR01's `int-corp` adapter to Allow All. VirtualBox internal networks deliver unicast frames per destination MAC, and mirroring another pair's unicast traffic to a third NIC is version-dependent. It must not be assumed to work. Verification gate for phase 3: `tcpdump` on NDR01 must see a WIN01-to-SOC01 flow before Suricata rules are trusted. If that capture fails, re-plumb to the inline bridge model in section 12, gate G2. Do not leave promiscuous capture as an unverified dependency.
 
 ## 5. Guest matrix
 
@@ -127,7 +127,7 @@ On a 5 GB guest the indexer heap is capped:
 - Single-node, zero replicas
 - Index lifecycle: delete indices older than 7 days
 - Alert archive: 30 days or 5 GB, whichever comes first
-- If the indexer OOMs during phase-1 tuning, stop `wazuh-dashboard` inside the guest for the ingestion test. That frees about 1 GB inside SOC01. The host browser does not free guest RAM
+- If the indexer OOMs during phase-1 tuning, run `sudo systemctl stop wazuh-dashboard` inside SOC01 for the ingestion test. That frees 0.8–1 GB of guest RAM. The host browser does not free guest RAM. Restart it with `sudo systemctl start wazuh-dashboard` after the test
 
 Do not raise SOC01 to 6 GB while WIN01 and a third guest are on. 6 GB is allowed only for a phase-1 solo tuning window: SOC01 6 GB + WIN01 4 GB = 10 GB, third guests off.
 
@@ -161,7 +161,13 @@ Exit gate: host-only ping from the host to a temporary Linux guest on `10.10.30.
 
 Build SOC01 and WIN01. Install Wazuh all-in-one. WIN01 must be created with VirtualBox guest type "Windows 11" so the wizard defaults to EFI, virtual TPM 2.0, and Secure Boot support, which the installer requires. After install, apply the 4 GB RAM fit tweaks: disable Memory Integrity / Core Isolation and transparency and animation effects. Install the Wazuh agent and the latest Sysmon on WIN01. Sysmon config must log Event ID 1 and Event ID 10, including access to `lsass.exe`. SwiftOnSecurity `sysmonconfig.xml` (or a documented subset of it) is the baseline config. Collect `Microsoft-Windows-Sysmon/Operational` and Security logs.
 
-Detach NAT on both guests after install. Snapshot both powered off as `base-phase1`.
+Pre-isolation software checklist, completed BEFORE NAT is detached. Detaching NAT too early turns a missing package into an hour of re-plumbing:
+
+- Host: VirtualBox installer, Extension Pack, Ubuntu Server 24.04 LTS ISO, Windows 11 Enterprise Evaluation ISO downloaded
+- WIN01: Windows updates applied, latest Sysmon extracted from the Sysinternals Suite (suite downloaded and unpacked locally), the chosen `sysmonconfig.xml`, 7-Zip, a browser, and the Wazuh agent MSI
+- SOC01: `curl`, `jq`, `tmux`, `htop`, `net-tools`, and the Wazuh all-in-one repository configured while online
+
+Only then: detach NAT on both guests. Snapshot both powered off as `base-phase1`.
 
 Exit gate: UC-00 and UC-01 pass. That is portfolio milestone 1.
 
@@ -175,7 +181,7 @@ Power-on: S2. If the host swaps, drop WIN01 to a console session and close the h
 
 ### Phase 3 — NDR
 
-Add NDR01. Suricata in IDS mode, not inline, unless the promiscuous-mode gate fails. A Wazuh agent on NDR01 forwards `eve.json`. No packet capture retention. A 1 GB pcap ring is allowed only while collecting evidence for one test, then deleted.
+Add NDR01. Suricata in IDS mode. Capture starts passive on the promiscuous NIC. If the tcpdump gate (section 12, gate G2) fails, re-plumb to the inline bridge model before trusting any rule. A Wazuh agent on NDR01 forwards `eve.json`. No packet capture retention. A 1 GB pcap ring is allowed only while collecting evidence for one test, then deleted.
 
 Exit gate: a lab-only HTTP User-Agent `lab-ndr-test` from WIN01 to SOC01 produces a custom Suricata alert (`sid` in the local range) visible in Wazuh. No public exploit traffic. No ET rule that requires a real attack tool.
 
@@ -294,7 +300,39 @@ Document these limits next to the architecture so a recruiter is not misled:
 - Suricata here is a single-segment IDS, not a full NDR platform
 - Free-tool coverage is not commercial-product parity
 
-## 12. Acceptance for this design
+## 12. Engineering verification gates
+
+### G1 — Phase 1 ingestion health, before UC-01
+
+Run after UC-00 and immediately before UC-01, inside SOC01:
+
+1. `curl -ks https://127.0.0.1:9200/_cluster/health?pretty` → `status` must be `green`
+2. `curl -ks https://127.0.0.1:9200/_cat/nodes?v&h=name,heap.percent,ram.percent` → `heap.percent` under 75, `ram.percent` under 90
+3. `free -m` → at least 300 MB guest headroom with WIN01 streaming events
+4. `wazuh-indexer-cli status` if the CLI exists in the installed version; the API checks above are the version-proof equivalent
+
+If health is not green or heap is pinned, the UC-01 simulation is paused until the S1-tune path (section 5) is applied. Do not demo a milestone on a red indexer.
+
+### G2 — Phase 3 capture fallback
+
+Step 1, passive test: with NDR01 on `int-corp` in promiscuous Allow All, `tcpdump -i <nic>` must show a WIN01-to-SOC01 flow.
+
+If it does not, the default re-plumb is the inline bridge model:
+
+1. Split `int-corp` into `int-corp-east` (WIN01, DC01) and `int-corp-west` (SOC01)
+2. NDR01 gets one NIC on each segment and bridges them (`ip link add br0 type bridge`, enslave both NICs, up)
+3. All hosts keep their existing `10.10.10.0/24` addresses. No renumbering, so phases 1–2 keep working
+4. Suricata binds `br0`. All WIN01-to-SOC01 traffic now transits the sensor deterministically
+
+Second fallback, routed model, only if bridging fails:
+
+1. Move WIN01 to `10.10.20.0/24` with NDR01 (`10.10.20.1`) as its default gateway
+2. NDR01 also sits on `int-corp` (`10.10.10.40`) and routes between the two segments
+3. Suricata sniffs both interfaces
+
+A plain "NDR01 as router between LAB-CORP and LAB-SEC" is not a valid capture design on its own: WIN01 and SOC01 share the LAB-CORP subnet, so their on-link traffic bypasses any router. Traffic must be forced through the sensor, either by bridging or by subnet split.
+
+## 13. Acceptance for this design
 
 This design is accepted when the reviewer agrees with all of the following:
 
@@ -304,11 +342,11 @@ This design is accepted when the reviewer agrees with all of the following:
 4. MAIL01, SRV01, Velociraptor, Security Onion, and a separate analyst VM are out of the first four phases
 5. The first implementation plan covers Phase 0 and Phase 1 only
 
-## 13. Out of scope for the first implementation plan
+## 14. Out of scope for the first implementation plan
 
 Phase 2–5 build steps, custom Suricata rule files, the n8n workflow JSON, Samba provisioning, and any host hardening beyond "no bridged NIC". Those get their own plan after milestone 1 passes.
 
-## 14. Versions verified against official sources, October 2026
+## 15. Versions verified against official sources, October 2026
 
 | Component | Verified state | Consequence for this design |
 |---|---|---|
