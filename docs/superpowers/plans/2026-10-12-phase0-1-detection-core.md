@@ -627,6 +627,8 @@ Get-WinEvent -ListLog "Microsoft-Windows-Sysmon/Operational" | Select-Object Rec
 
 Expected: service `Running`; the event log shows a record count that grows when any process starts.
 
+Failure mode: if the schemaversion header does not match the binary, the Sysmon service refuses to start and logs an "invalid manifest" error in the Windows Application event log. Fix: align the `schemaversion` attribute with the value shown by `Sysmon64.exe -?`, re-save `C:\lab\sysmon-config.xml`, reload with `Sysmon64.exe -c C:\lab\sysmon-config.xml`, then check `Get-Service Sysmon64` again (expect `Running`).
+
 - [ ] **Step 3: Write the agent config additions in the repo**
 
 Create `lab/win01/ossec.conf.additions.xml`:
@@ -915,7 +917,7 @@ Expected: `Snapshot taken. UUID: ...`
 
 - [ ] **Step 6: Run the simulation**
 
-On WIN01, admin PowerShell, in this exact order:
+On WIN01, admin PowerShell. Run the entire block below in one continuous PowerShell session; do not close the console between lines — if the session ends, `$lsassPid` becomes null and rundll32 dumps nothing:
 
 ```powershell
 Set-MpPreference -DisableRealtimeMonitoring $true
