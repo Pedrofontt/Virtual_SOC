@@ -29,6 +29,14 @@ If the indexer OOMs or the API times out during testing:
 4. After the test: sudo systemctl start wazuh-dashboard
 5. If still OOMing: power off WIN01, raise SOC01 to 6 GB (S1-tune), re-run
 
+## Build log (2026-10-13)
+
+- Ubuntu 24.04.5 minimal installed (3 vCPU / 5 GB / 50 GB), socadmin account, OpenSSH enabled
+- Static IPs via netplan: enp0s3 10.10.30.10/24, enp0s8 10.10.10.5/24, enp0s9 DHCP (NAT)
+- Tools installed: curl jq tmux htop net-tools iputils-ping
+- Remote admin: plink from host: plink -batch -pw <pw> socadmin@10.10.30.10 (host key SHA256:h9rirGAifvJjmZK2Ppdc177c72FOewK6EDwjKUKAyoo)
+- Verified: guest reaches 10.10.30.1 and archive.ubuntu.com (HTTP 200)
+
 ## Build deviations from the plan (log only, not a problem)
 
 - VM created with VBoxManage commands instead of the GUI wizard (same parameters).
