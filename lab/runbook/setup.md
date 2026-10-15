@@ -103,6 +103,30 @@ Do NOT use `inituefivarstore` (it wipes boot entries).
 ### 2.3 Install Windows 11 Eval (interactive)
 - Language → Install now → "I don't have a product key" → Windows 11 Enterprise (Evaluation)
 - Custom install → select 64 GB disk
-- At the MS account screen: Shift+F10 → `oobe\bypassnro` → reboot → "I don't have internet" → limited setup → local user `labadmin`
+- At the account screen, do NOT sign in with a Microsoft account. Reliable local-account path:
+  on "Let's set things up for your work or school" → **Sign-in options** → **Domain join instead** → local user `labadmin`.
+  (`oobe\bypassnro` also works but was flaky — the domain-join path is deterministic.)
 
-### 2.4 (pending) Guest Additions + Sysmon + Wazuh agent — record here as done
+### 2.4 Guest Additions + static IP + fit tweaks + Sysinternals
+```powershell
+# Guest Additions (host menu): Devices -> Insert Guest Additions CD image ->
+#   in VM run VBoxWindowsAdditions-amd64.exe -> reboot.
+# Enable shared clipboard (runtime; persists only this boot):
+VBoxManage controlvm WIN01 clipboard mode bidirectional
+VBoxManage controlvm WIN01 draganddrop bidirectional
+```
+In WIN01 (admin PowerShell):
+```powershell
+# static IP on the int-corp adapter (usually "Ethernet"; NAT is "Ethernet 2")
+netsh interface ip set address name="Ethernet" static 10.10.10.20 255.255.255.0
+# Memory Integrity off (fit tweak; verify via Settings > Privacy > Device security)
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity" /v Enabled /t REG_DWORD /d 0 /f
+# transparency off: Settings > Personalization > Colors > "Transparency effects" = Off
+# animations off: Settings > Accessibility > Visual effects > "Animation effects" = Off
+# Sysinternals (Sysmon):
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+New-Item -ItemType Directory -Force -Path "C:\lab\tools" | Out-Null
+Invoke-WebRequest -Uri "https://download.sysinternals.com/files/Sysmon.zip" -OutFile "$env:TEMP\Sysmon.zip"
+Expand-Archive "$env:TEMP\Sysmon.zip" -DestinationPath "C:\lab\tools" -Force
+```
+
