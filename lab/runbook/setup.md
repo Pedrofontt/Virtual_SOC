@@ -143,6 +143,34 @@ msiexec /i "$env:TEMP\wazuh-agent-4.14.8-1.msi" /qn WAZUH_MANAGER="10.10.10.5" W
 Start-Service WazuhSvc   # service name is WazuhSvc, not Wazuh
 ```
 
+### 2.5b FIM config correction (Task 6) — CRITICAL for Windows + 4.14.8
+The 2.5 snippet above is WRONG for Windows in two ways (verified empirically):
+- A second `<syscheck>` block is silently IGNORED. The `<directories>` line must be merged INTO the existing default `<syscheck>` block (after `<frequency>43200</frequency>`).
+- Per-directory `frequency` is ignored on Windows agents (log warning 6701, global 43200 wins).
+- Use realtime instead: `<directories check_all="yes" realtime="yes">C:\lab\critical</directories>` (realtime alerts instantly; supported on Windows).
+Final repo artifact: `lab/win01/ossec.conf.additions.xml`.
+
+### 2.5c Wazuh 4.14.8 FIM decoder fix (Task 6) — REQUIRED or FIM alerts never fire
+Wazuh 4.14.8 ships rules 550/553/554 whose `decoded_as` names (syscheck_new_entry,
+syscheck_integrity_changed, syscheck_deleted, + 6 registry variants) exist nowhere in the
+shipped decoder files. analysisd's FIM alert path therefore never matches a rule: events are
+stored in fim_entry but zero alerts. Fix on SOC01: append decoder stubs to
+`/var/ossec/etc/decoders/local_decoder.xml` (prematch intentionally impossible - they only
+exist so getDecoderfromlist() finds them):
+
+```xml
+<decoder name="syscheck_new_entry"><parent>wazuh</parent><prematch>^__fim_lab_never_match_new$</prematch></decoder>
+<decoder name="syscheck_integrity_changed"><parent>wazuh</parent><prematch>^__fim_lab_never_match_mod$</prematch></decoder>
+<decoder name="syscheck_deleted"><parent>wazuh</parent><prematch>^__fim_lab_never_match_del$</prematch></decoder>
+<decoder name="syscheck_registry_key_added"><parent>wazuh</parent><prematch>^__fim_lab_never_match_rka$</prematch></decoder>
+<decoder name="syscheck_registry_key_modified"><parent>wazuh</parent><prematch>^__fim_lab_never_match_rkm$</prematch></decoder>
+<decoder name="syscheck_registry_key_deleted"><parent>wazuh</parent><prematch>^__fim_lab_never_match_rkd$</prematch></decoder>
+<decoder name="syscheck_registry_value_added"><parent>wazuh</parent><prematch>^__fim_lab_never_match_rva$</prematch></decoder>
+<decoder name="syscheck_registry_value_modified"><parent>wazuh</parent><prematch>^__fim_lab_never_match_rvm$</prematch></decoder>
+<decoder name="syscheck_registry_value_deleted"><parent>wazuh</parent><prematch>^__fim_lab_never_match_rvd$</prematch></decoder>
+```
+Then `sudo /var/ossec/bin/wazuh-control restart`.
+
 ### 2.6 Isolate + snapshot
 ```powershell
 VBoxManage controlvm WIN01 acpipowerbutton   # can take 10+ min on fresh install (Windows updates at shutdown)
