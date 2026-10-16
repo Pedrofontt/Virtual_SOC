@@ -1,0 +1,8 @@
+<Sysmon schemaversion="4.90">
+  <EventFiltering>
+    <ProcessCreate onmatch="exclude"/>
+    <ProcessAccess onmatch="include">
+      <TargetImage condition="is">C:\Windows\System32\lsass.exe</TargetImage>
+    </ProcessAccess>
+  </EventFiltering>
+</Sysmon>

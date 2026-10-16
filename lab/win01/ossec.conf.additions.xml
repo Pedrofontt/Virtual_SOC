@@ -1,0 +1,13 @@
+<!-- WIN01 agent config additions (Task 5, corrected in Task 6) -->
+<!-- 1. Sysmon localfile: append inside <ossec_config> (multiple localfile blocks are fine) -->
+<localfile>
+  <location>Microsoft-Windows-Sysmon/Operational</location>
+  <log_format>eventchannel</log_format>
+</localfile>
+
+<!-- 2. FIM: insert this <directories> line INSIDE the existing default <syscheck> block.
+     Do NOT add a second <syscheck> block - Wazuh ignores duplicate syscheck sections
+     (verified in Task 6: appended block was silently skipped).
+     Do NOT use per-directory frequency on Windows - warning 6701, attribute ignored.
+     realtime="yes" gives instant change detection (supported on Windows). -->
+<directories check_all="yes" realtime="yes">C:\lab\critical</directories>
