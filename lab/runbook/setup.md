@@ -130,3 +130,24 @@ Invoke-WebRequest -Uri "https://download.sysinternals.com/files/Sysmon.zip" -Out
 Expand-Archive "$env:TEMP\Sysmon.zip" -DestinationPath "C:\lab\tools" -Force
 ```
 
+### 2.5 Sysmon + Wazuh agent (Task 5)
+```powershell
+# Sysmon 15.22 with repo config (schema 4.90): EID 1 all + EID 10 lsass only
+& C:\lab\tools\Sysmon64.exe -accepteula -i C:\lab\sysmon-config.xml
+# Wazuh agent 4.14.8 (while NAT is still attached)
+Invoke-WebRequest -Uri "https://packages.wazuh.com/4.x/windows/wazuh-agent-4.14.8-1.msi" -OutFile "$env:TEMP\wazuh-agent-4.14.8-1.msi"
+msiexec /i "$env:TEMP\wazuh-agent-4.14.8-1.msi" /qn WAZUH_MANAGER="10.10.10.5" WAZUH_REGISTRATION_SERVER="10.10.10.5" WAZUH_AGENT_NAME="win01"
+# Append before </ossec_config> in C:\Program Files (x86)\ossec-agent\ossec.conf:
+#   <localfile><location>Microsoft-Windows-Sysmon/Operational</location><log_format>eventchannel</log_format></localfile>
+#   <syscheck><directories check_all="yes" realtime="no">C:\lab\critical</directories></syscheck>
+Start-Service WazuhSvc   # service name is WazuhSvc, not Wazuh
+```
+
+### 2.6 Isolate + snapshot
+```powershell
+VBoxManage controlvm WIN01 acpipowerbutton   # can take 10+ min on fresh install (Windows updates at shutdown)
+VBoxManage modifyvm WIN01 --nic2 none        # detach NAT (needs VM off)
+VBoxManage modifyvm WIN01 --clipboard-mode bidirectional --draganddrop-mode bidirectional
+VBoxManage snapshot WIN01 take base-phase1   # sysmon + wazuh agent enrolled, no tests run
+```
+

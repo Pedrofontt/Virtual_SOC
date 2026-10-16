@@ -12,6 +12,13 @@ Fit tweaks applied:
 
 Tools: Sysinternals (Sysmon) extracted to `C:\lab\tools`.
 
+## Detection stack (Task 5)
+
+- Sysmon 15.22 installed with `lab/win01/sysmon-config.xml` (schema 4.90): EID 1 (all process create) + EID 10 (lsass access only).
+- Wazuh agent 4.14.8 (MSI, `WAZUH_MANAGER=10.10.10.5`, name `win01`); service name is `WazuhSvc` (not `Wazuh`). Enrolled as agent 001, status active.
+- `ossec.conf` additions applied: Sysmon eventchannel localfile + syscheck on `C:\lab\critical` (check_all, realtime off).
+- Telemetry verified: Sysmon EID 1/5/10 events reach SOC01 archives; detections fire as Wazuh 4.14 rules 92000+ (92021, 92031, 92066 observed). NOTE: Wazuh 4.14 no longer uses the plan's "Sysmon - Event 1" / rule 61601 naming — that check is obsolete.
+
 ## Lab controls log
 
 | Date | Control | Reason | Restored? |
