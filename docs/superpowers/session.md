@@ -40,8 +40,10 @@ slowly — Windows updates apply at shutdown on a fresh install; do NOT force po
 
 - **SOC01**: POWERED OFF. Snapshots: `base-soc01` + `base-phase1` (stack tuned, win01 enrolled).
   Start: `VBoxManage startvm SOC01` (indexer ~90 s to go active).
-- **WIN01**: shutdown in progress (running but Windows mid-shutdown as of last check). Pending:
-  detach NAT, persist clipboard, snapshot `base-phase1`, then re-verify agent active over int-corp only.
+- **WIN01**: SAVED (savestate) — frozen mid-shutdown (Windows updates). To proceed: `VBoxManage startvm WIN01`
+  resumes it; Windows continues its shutdown/updates and should power itself off in minutes. If it instead
+  reaches the desktop, shut down cleanly again. Then: detach NAT, persist clipboard, snapshot `base-phase1`,
+  then re-verify agent active over int-corp only.
 - **Secrets**: lab/runbook/.local-credentials.md now includes WIN01 labadmin password.
 - **Repo**: win01.md + setup.md updated with Sysmon/agent sections; commit pending in next session
   (session.md included in same commit).
