@@ -45,6 +45,11 @@ The exact process used for rule 100010 (UC-01). Follow it for every new detectio
 - Repo copy is source of truth → `pscp` to SOC01 → `install -o root -g wazuh -m 640` into
   `/var/ossec/etc/rules/local_rules.xml` → `systemctl restart wazuh-manager` → check
   `ossec.log` for errors.
+- UI alternative (Wazuh 4.14 dashboard): **Server Management → Rules → Manage rules files →
+  edit the custom rules file (local_rules.xml)**. The UI writes the manager file directly and
+  reloads the manager on save. Only ever edit CUSTOM rules files this way (never shipped
+  rules files — updates overwrite them). After ANY UI edit, sync the file back to the repo
+  (`pscp` SOC01 -> host -> commit) so the repo stays the source of truth.
 - `wazuh-logtest` CANNOT test the windows_eventchannel chain — verify with real events.
 
 ## 7. Test with a real event + benign control
