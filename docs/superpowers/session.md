@@ -1,6 +1,6 @@
 # Session state — resume here
 
-Last updated: 2026-10-16 (session 7). Resume by reading this file, then continue with "Next session — first steps" below.
+Last updated: 2026-10-16 (session 8). Resume by reading this file, then continue with "Next session — first steps" below.
 
 ## Where we are — MILESTONE 1 COMPLETE (Tasks 1–8)
 
@@ -34,10 +34,14 @@ Next: wrap-up review, then plan Phase 2 (identity — DC01, S2, 11 GB).
 
 ## Next session — first steps
 
-1. Evidence gap (optional): user screenshots UC-00 FIM alert (Discover `rule.id:550`) -> lab/evidence/uc-00-alert.png.
+1. USER PRACTICE (planned): user does their first Wazuh UI rule edit — Server Management → Rules →
+   Manage rules files → custom rules file. Suggested practice: tweak rule 100010's description,
+   save; then I verify manager reloaded clean (is-active + ossec.log), pscp the file back to the
+   repo, and commit (repo stays source of truth).
+2. Evidence gap (optional): user screenshots UC-00 FIM alert (Discover `rule.id:550`) -> lab/evidence/uc-00-alert.png.
    EID 10 Event Viewer shot would need re-running the UC-01 simulation (lab controls + dump + screenshot + revert).
-2. Milestone 1 wrap-up review with the user; then brainstorming + plan for Phase 2 (DC01, S2).
-3. Before Phase 2: refresh snapshots to base-phase1-fixed on both VMs.
+3. Milestone 1 wrap-up review with the user; then brainstorming + plan for Phase 2 (DC01, S2).
+4. Before Phase 2: refresh snapshots to base-phase1-fixed on both VMs.
 
 ## Notes carried over
 
