@@ -24,4 +24,5 @@ Rules: never exceed 11 GB of running guests. Boot SOC01 first, wait for the API,
 
 ## Current state
 
-Phase 0–1 in progress. See runbook/ and cases/.
+Milestone 1 COMPLETE: SOC01 + WIN01 (S1) detect UC-00 FIM and UC-01 T1003.001.
+Evidence in evidence/, use cases in cases/. Next: Phase 2 identity (DC01, S2).

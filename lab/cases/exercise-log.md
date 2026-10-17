@@ -9,3 +9,5 @@
 | 2026-10-16 | UC-01 LSASS dump run 1 | rule 100010 | 100010 x2 (0x1410 + 0x1fffff), 22:16:33Z | yes (snapshot revert) |
 | 2026-10-16 | UC-01 LSASS dump run 2 | rule 100010 | 100010 x2 (0x1410 + 0x1fffff), 22:19:56Z | yes (snapshot revert) |
 | 2026-10-16 | UC-01 benign (Notepad) | no 100010 | no 100010 | n/a |
+| 2026-10-16 | Gate G1 (baseline, Task 3) | green / heap <75 / >=300 MB headroom | yellow (accepted, ISM shard) / heap 51% / 2506 MB avail | n/a |
+| 2026-10-16 | Gate G1 (final, Task 8) | still green / heap <75 / >=300 MB | yellow (accepted, ISM shard) / heap 53% / 2368 MB avail | n/a |
