@@ -139,7 +139,7 @@ Invoke-WebRequest -Uri "https://packages.wazuh.com/4.x/windows/wazuh-agent-4.14.
 msiexec /i "$env:TEMP\wazuh-agent-4.14.8-1.msi" /qn WAZUH_MANAGER="10.10.10.5" WAZUH_REGISTRATION_SERVER="10.10.10.5" WAZUH_AGENT_NAME="win01"
 # Append before </ossec_config> in C:\Program Files (x86)\ossec-agent\ossec.conf:
 #   <localfile><location>Microsoft-Windows-Sysmon/Operational</location><log_format>eventchannel</log_format></localfile>
-#   <syscheck><directories check_all="yes" realtime="no">C:\lab\critical</directories></syscheck>
+#   <syscheck><directories check_all="yes" realtime="yes">C:\lab\critical</directories></syscheck>  # NOTE: must be merged into the existing block, see 2.5b
 Start-Service WazuhSvc   # service name is WazuhSvc, not Wazuh
 ```
 
@@ -177,5 +177,36 @@ VBoxManage controlvm WIN01 acpipowerbutton   # can take 10+ min on fresh install
 VBoxManage modifyvm WIN01 --nic2 none        # detach NAT (needs VM off)
 VBoxManage modifyvm WIN01 --clipboard-mode bidirectional --draganddrop-mode bidirectional
 VBoxManage snapshot WIN01 take base-phase1   # sysmon + wazuh agent enrolled, no tests run
+```
+
+### 2.7 UC-01 custom rule 100010 deploy (Task 7)
+Rule source of truth: `lab/soc01/local_rules.xml`. Deploy from host (byte-for-byte copy):
+```powershell
+# host:
+& "C:\Program Files\PuTTY\pscp.exe" -batch -hostkey "SHA256:h9rirGAifvJjmZK2Ppdc177c72FOewK6EDwjKUKAyoo" -pw <PW> lab\soc01\local_rules.xml socadmin@10.10.30.10:/tmp/local_rules.xml
+# SOC01:
+install -o root -g wazuh -m 640 /tmp/local_rules.xml /var/ossec/etc/rules/local_rules.xml
+systemctl restart wazuh-manager && systemctl is-active wazuh-manager
+grep -iE "error|invalid" /var/ossec/logs/ossec.log | tail -5   # expect nothing new
+```
+IMPORTANT (4.14): the rule must use `<if_group>sysmon_event_10</if_group>` — Wazuh 4.14 has
+NO `61610` parent rule; the group is added by the built-in `windows_eventchannel` decoder (not
+an XML file, not greppable). `wazuh-logtest` cannot exercise this decoder chain — verify with
+real events only.
+
+### 2.8 UC-01 lab controls on WIN01 (test window only, all reverted by snapshot)
+```powershell
+# Defender real-time protection: Windows Security GUI -> Virus & threat protection ->
+#   Manage settings -> Real-time protection Off.
+#   (Set-MpPreference -DisableRealtimeMonitoring is AMSI-blocked: "This script contains
+#   malicious content". Tamper Protection was already Off on this image.)
+# LSA Protection off (Win11 24H2+ ships RunAsPPL=2; comsvcs MiniDump fails silently with it on):
+reg add "HKLM\SYSTEM\CurrentControlSet\Control\Lsa" /v RunAsPPL /t REG_DWORD /d 0 /f
+Restart-Computer
+# Simulation (admin PowerShell):
+$lsassPid = (Get-Process lsass).Id
+rundll32.exe C:\windows\System32\comsvcs.dll, MiniDump $lsassPid C:\lab\dumps\lsass_lab.dmp full
+# Expect: 2 rule-100010 alerts per run (probe open 0x1410 + dump open 0x1fffff).
+# Snapshot around test: VBoxManage snapshot WIN01 take pre-uc01  (before)  / restore (after).
 ```
 
