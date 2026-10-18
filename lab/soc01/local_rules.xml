@@ -12,7 +12,7 @@
     <mitre>
       <id>T1003.001</id>
     </mitre>
-    <group>credential_access,lab,sysmon_process_access,</group>
+    <group>credential_access,sysmon_process_access,</group>
   </rule>
 
   <rule id="100020" level="12">
@@ -23,6 +23,6 @@
     <mitre>
       <id>T1059.001</id>
     </mitre>
-    <group>execution,lab,sysmon_process_create,</group>
+    <group>execution,sysmon_process_create,</group>
   </rule>
 </group>
