@@ -39,13 +39,15 @@ Next: Phase 2 brainstorming (identity — DC01, S2, 11 GB).
 
 ## Next session — first steps
 
-1. Cosmetic cleanup (optional UI practice): rule 100020's `<group>` duplicates the file-level `lab`
-   tag (groups array shows `lab` twice). Remove `lab,` from the rule's group via UI, save, sync back.
-2. Evidence gap (optional): user screenshots UC-00 FIM alert (Discover `rule.id:550`) ->
-   lab/evidence/uc-00-alert.png (only valid while the 7-day alert index retains it).
-3. Phase 2: brainstorming + plan for identity (DC01, S2) — DC01 is 2 vCPU/4 GB, SOC01 goes to 6 GB,
+1. ~~Cosmetic cleanup: dedupe `lab` group~~ DONE — user edited both rules via UI, verified running
+   ruleset via API (single `lab` each), synced + committed `c890205`. UC-00 screenshot skipped by
+   user. UC-02 fully closed.
+2. Phase 2: brainstorming + plan for identity (DC01, S2) — DC01 is 2 vCPU/4 GB, SOC01 goes to 6 GB,
    fits the 11 GB budget.
-4. Before Phase 2: refresh snapshots to base-phase1-fixed on both VMs.
+3. Before Phase 2: refresh snapshots to base-phase1-fixed on both VMs.
+   (NOTES: dashboard rules-editor saves may not log a "Reloading ruleset" line — verify with
+   `systemctl restart wazuh-manager` + API GET /rules; pscp as socadmin can't read
+   /var/ossec/etc/rules files (permission denied) — pull via `plink ... sudo cat` instead.)
 
 ## Notes carried over
 
