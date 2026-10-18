@@ -11,3 +11,7 @@
 | 2026-10-16 | UC-01 benign (Notepad) | no 100010 | no 100010 | n/a |
 | 2026-10-16 | Gate G1 (baseline, Task 3) | green / heap <75 / >=300 MB headroom | yellow (accepted, ISM shard) / heap 51% / 2506 MB avail | n/a |
 | 2026-10-16 | Gate G1 (final, Task 8) | still green / heap <75 / >=300 MB | yellow (accepted, ISM shard) / heap 53% / 2368 MB avail | n/a |
+| 2026-10-18 | UC-02 PS -enc capture (pre-rule) | shipped coverage check | 92027 only; 92057 missed -Enc (bug proof) | n/a |
+| 2026-10-18 | UC-02 PS -enc run 1 (PS parent) | rule 100020 | 100020 lvl 12, 06:25:14Z | n/a |
+| 2026-10-18 | UC-02 PS -enc run 2 (cmd parent) | rule 100020 | 100020 lvl 12, 07:00:36Z | n/a |
+| 2026-10-18 | UC-02 benign (plain -Command, PS + cmd) | no 100020 | no 100020 | n/a |

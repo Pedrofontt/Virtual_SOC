@@ -2,6 +2,42 @@
 
 Written as problem -> symptom -> root cause -> fix. Setup commands live in `setup.md`; this file is the "why".
 
+## UC-02 (T1059.001 PowerShell -enc, 2026-10-18)
+
+1. **Raw quote characters in a rule's regex break the dashboard save (API error 1113).**
+   Problem: first version of rule 100020 used `["']?` for optional quotes around the base64 payload.
+   Symptom: saving via the UI failed — "Could not upload rule (1113) - XML syntax error" (both for a
+   new file and for `local_rules.xml`; nothing written to disk).
+   Root cause: the `"` inside the field text breaks Wazuh's XML validation path for the upload.
+   Fix: PCRE2 hex escapes — `[\x22\x27]?` — same regex semantics, zero raw quote chars in the file.
+
+2. **Shipped encoded-command coverage is parent-specific AND buggy.**
+   Problem: evaluating shipped rules before writing ours (recipe step 3).
+   Findings: 92057 only fires when `parentImage = powershell.exe`; its alternation
+   `(encodedcommand|e|ea|ec|encodeda|encode|en|enco)\b` misses `-Enc` (no `enc`/`enco` alternatives and
+   `\b` kills prefix matching). 92071 is WMI-parent only. Proven empirically: our capture event fired
+   only generic 92027. The classic `cmd.exe -> powershell -enc` has NO shipped coverage.
+   Fix: custom generic rule (no parent constraint) — and it caught both parent variants.
+
+3. **Grepping `alerts.json` self-matches your own sudo audit lines.**
+   Symptom: alert counts drifted +1 per check; `grep -c id:100020` matched a sudo alert whose
+   `full_log` recorded the grep command itself.
+   Root cause: every `sudo` on SOC01 generates rule-5402 alerts containing the command text; and
+   `id:100020` does not match the JSON `"id":"100020"` (quote+colon), so the only match WAS the sudo line.
+   Fix: grep the description phrase (`LAB: PowerShell encoded ...`) and filter `COMMAND` lines out, or
+   use jq on the JSON structure. Also: the failed check still adds a sudo alert with the same phrase —
+   counts need +1 compensation per previous grep.
+
+4. **EID 1 field casing differs from EID 10.**
+   Symptom: assumed `win.eventdata.commandline` (lowercase L) by analogy with EID 10's `sourceImage`.
+   Reality (from a real alert): EID 1 uses `win.eventdata.commandLine` — capital L — while `image` is
+   lowercase. Always confirm per-event-id field names from `alerts.json` (recipe step 2 paid off).
+
+5. **Cosmetic: rule group duplicating the file-level group name.**
+   Symptom: alert `groups` shows `lab` twice (`"groups":["lab","execution","lab","sysmon_process_create"]`).
+   Root cause: `<group name="lab,">` on the file root already tags everything `lab`; the rule's own
+   `<group>` also contains `lab`. Harmless — optional cleanup.
+
 ## Task 7 (UC-01 T1003.001)
 
 1. **Defender's AMSI blocks its own disable command.**

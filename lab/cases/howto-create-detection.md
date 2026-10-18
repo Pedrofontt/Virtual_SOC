@@ -38,6 +38,8 @@ The exact process used for rule 100010 (UC-01). Follow it for every new detectio
   </rule>
   ```
 - Field rules: ANCHOR your regexes (`^...$`), use `(?i)`, escape dots (`\.exe`).
+- NO raw quote chars in regex text: the dashboard save fails with API error 1113 (XML) — use PCRE2
+  hex escapes `\x22` (`"`) / `\x27` (`'`) instead (UC-02 lesson).
 - Constrain enough fields to kill false positives; keep enough to catch variants.
 - Level 12+ for real attacks; add MITRE id.
 

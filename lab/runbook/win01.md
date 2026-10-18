@@ -27,3 +27,4 @@ Tools: Sysinternals (Sysmon) extracted to `C:\lab\tools`.
 | 2026-10-16 | Defender real-time protection disabled for UC-01 window (GUI toggle — Set-MpPreference is AMSI-blocked) | MiniDump would be killed before Sysmon records it | yes (pre-uc01 snapshot revert) |
 | 2026-10-16 | Tamper Protection: already OFF on this image, no action needed | — | n/a |
 | 2026-10-16 | LSA Protection disabled: `reg add HKLM\SYSTEM\CurrentControlSet\Control\Lsa /v RunAsPPL /t REG_DWORD /d 0 /f` + reboot | Win11 24H2+ ships RunAsPPL=2; comsvcs MiniDump fails silently with it on | yes (pre-uc01 snapshot revert) |
+| 2026-10-18 | UC-02: no defense controls changed (benign base64 payload `Write-Output hello` only; detection source = Sysmon EID 1) | — | n/a |
