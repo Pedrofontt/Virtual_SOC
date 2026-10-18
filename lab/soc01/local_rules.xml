@@ -14,4 +14,15 @@
     </mitre>
     <group>credential_access,lab,sysmon_process_access,</group>
   </rule>
+
+  <rule id="100020" level="12">
+    <if_group>sysmon_event1</if_group>
+    <field name="win.eventdata.image" type="pcre2">(?i)(?:powershell|pwsh)\.exe$</field>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)\s-(?:encodedcommand|enco|enc|ec|en|e)\b\s+[\x22\x27]?[A-Za-z0-9+/]{12,}={0,2}</field>
+    <description>LAB: PowerShell encoded command (T1059.001) - image $(win.eventdata.image)</description>
+    <mitre>
+      <id>T1059.001</id>
+    </mitre>
+    <group>execution,lab,sysmon_process_create,</group>
+  </rule>
 </group>
