@@ -1,6 +1,6 @@
 # Session state — resume here
 
-Last updated: 2026-10-18 (session 9). Resume by reading this file, then continue with "Next session — first steps" below.
+Last updated: 2026-10-19 (session 10). Resume by reading this file, then continue with "Next session — first steps" below.
 
 ## Where we are — MILESTONE 1 COMPLETE + UC-02 DONE
 
@@ -39,15 +39,19 @@ Next: Phase 2 brainstorming (identity — DC01, S2, 11 GB).
 
 ## Next session — first steps
 
-1. ~~Cosmetic cleanup: dedupe `lab` group~~ DONE — user edited both rules via UI, verified running
-   ruleset via API (single `lab` each), synced + committed `c890205`. UC-00 screenshot skipped by
-   user. UC-02 fully closed.
-2. Phase 2: brainstorming + plan for identity (DC01, S2) — DC01 is 2 vCPU/4 GB, SOC01 goes to 6 GB,
-   fits the 11 GB budget.
-3. Before Phase 2: refresh snapshots to base-phase1-fixed on both VMs.
-   (NOTES: dashboard rules-editor saves may not log a "Reloading ruleset" line — verify with
-   `systemctl restart wazuh-manager` + API GET /rules; pscp as socadmin can't read
-   /var/ossec/etc/rules files (permission denied) — pull via `plink ... sudo cat` instead.)
+1. ~~Phase 2 brainstorm/design/plan~~ DONE — spec `2026-10-18-phase2-identity-design.md` (f5e761a),
+   plan `2026-10-18-phase2-identity.md` (44d3c96). User authorized autonomous infra build (Tasks
+   0-5); Tasks 6-9 stay user-run.
+2. ~~Task 0 snapshots~~ DONE — base-phase1-fixed on both VMs; power outage hit mid-task; SOC01
+   recovered via full `wazuh-control restart` (stale wdb socket fixed), all services + API healthy.
+3. ~~Task 1 DC01 VM~~ DONE — unattended Ubuntu 24.04.5 install (user away; deviations from plan:
+   installer made plain ext4, no LVM resize needed; no gw route via 10.10.10.5 — SOC01 ip_forward=0
+   and has no dnsmasq; DC01 DNS=127.0.0.1 set per plan; internet via NAT nic2 until detached).
+   DC01: 10.10.10.10/24, ssh natpf 127.0.0.1:2222, creds in .local-credentials.md.
+4. NEXT: Task 2 Samba AD DC provisioning (plan Steps 1-6: samba stack, domain provision CORP.LAB,
+   DNS sanity, accounts svc-sql/victim/attacker + SPN + DONT_REQUIRE_PREAUTH, auth_json_audit).
+   Task 3 still pending: SOC01 pip bootstrap (get-pip.py failed on network) — wheels already in
+   /tmp/wheels/.
 
 ## Notes carried over
 
