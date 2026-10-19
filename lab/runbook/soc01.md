@@ -56,3 +56,23 @@ If the indexer OOMs or the API times out during testing:
   NIC1 points at "#2". All host-only references in the lab mean this adapter.
 - Ubuntu point release used: 24.04.5 (newest noble ISO at build time).
 - Host hypervisor stack disabled for VirtualBox (see "Host-level prerequisites" above).
+
+## Offline impacket install (Task 3, 2026-10-19)
+
+SOC01 has no internet and ships without pip (`python3 -m ensurepip` missing, get-pip.py wants network).
+Working offline procedure (everything via host):
+
+1. Host (Python 3.13 + pip): download Linux wheels targeting SOC01's Python 3.12:
+   `py -m pip download --dest C:\lab-vms\impacket-wheels --platform manylinux_2_17_x86_64 --python-version 3.12 --implementation cp --abi cp312 --only-binary=:all impacket ldapdomaindump`
+   Plus `typing-extensions` WITHOUT platform flags (universal wheel; flags make pip refuse it),
+   and the pip bootstrap trio: `py -m pip download pip setuptools wheel -d C:\lab-vms\pip-bootstrap --no-deps`.
+2. Transfer: `pscp C:\lab-vms\{impacket-wheels,pip-bootstrap}\*.whl socadmin@10.10.30.10:/tmp/wheels/`
+   (WARNING: /tmp is tmpfs — a SOC01 reboot wipes /tmp/wheels; re-transfer after reboots.)
+3. Bootstrap pip from its wheel (pip 26+, runs from the zip path):
+   `sudo python3 /tmp/wheels/pip-26.2.1-py3-none-any.whl/pip install --no-index --find-links /tmp/wheels/ --break-system-packages impacket ldapdomaindump`
+4. Gotchas seen:
+   - pip refuses to overwrite apt-installed `python3-blinker`/`python3-flask` -> `apt-get remove` them first.
+   - "Can't uninstall 'cryptography'" is harmless (apt-owned partial state).
+   - impacket 0.13.1 has no `__version__`; verify with `importlib.metadata.version('impacket')`.
+5. Result: GetUserSPNs.py / GetNPUsers.py / secretsdump.py in /usr/local/bin.
+   `/etc/hosts` on SOC01: `10.10.10.10 dc01.corp.lab dc01`.
