@@ -1,0 +1,14 @@
+<!-- /var/ossec/etc/ossec.conf additions on DC01 (Task 4 Step 3) — inserted before </ossec_config> -->
+<localfile>
+  <log_format>json</log_format>
+  <location>/var/log/samba/audit.json</location>
+</localfile>
+<localfile>
+  <log_format>syslog</log_format>
+  <location>/var/log/samba/log.samba</location>
+</localfile>
+<syscheck>
+  <disabled>no</disabled>
+  <frequency>43200</frequency>
+  <directories check_all="yes" realtime="yes">/var/lib/samba/private/sam.ldb</directories>
+</syscheck>
