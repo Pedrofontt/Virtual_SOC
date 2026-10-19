@@ -48,10 +48,12 @@ Next: Phase 2 brainstorming (identity — DC01, S2, 11 GB).
    installer made plain ext4, no LVM resize needed; no gw route via 10.10.10.5 — SOC01 ip_forward=0
    and has no dnsmasq; DC01 DNS=127.0.0.1 set per plan; internet via NAT nic2 until detached).
    DC01: 10.10.10.10/24, ssh natpf 127.0.0.1:2222, creds in .local-credentials.md.
-4. NEXT: Task 2 Samba AD DC provisioning (plan Steps 1-6: samba stack, domain provision CORP.LAB,
-   DNS sanity, accounts svc-sql/victim/attacker + SPN + DONT_REQUIRE_PREAUTH, auth_json_audit).
-   Task 3 still pending: SOC01 pip bootstrap (get-pip.py failed on network) — wheels already in
-   /tmp/wheels/.
+4. NEXT: Task 3 SOC01 impacket (pip bootstrap still pending — get-pip.py failed on network;
+   wheels already in /tmp/wheels/) + Task 4 DC01 Wazuh agent (deb already on DC01 /tmp,
+   enroll -m 10.10.10.5, localfile json audit.json + syslog log.samba + FIM sam.ldb).
+   ~~Task 2 Samba AD DC~~ DONE (51d4e24): CORP.LAB provisioned, accounts + SPN + victim
+   DONT_REQUIRE_PREAUTH, auth JSON audit to /var/log/samba/audit.json, NAT detached, snapshot
+   base-phase2. DC01 SSH now ONLY via SOC01 hop (key auth: socadmin@SOC01 -> dcadmin@10.10.10.10).
 
 ## Notes carried over
 
