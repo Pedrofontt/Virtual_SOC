@@ -9,6 +9,11 @@
 </localfile>
 <syscheck>
   <disabled>no</disabled>
-  <frequency>43200</frequency>
-  <directories check_all="yes" realtime="yes">/var/lib/samba/private/sam.ldb</directories>
+  <!-- TDB writes are mmap/msync: mtime changes but inotify does NOT fire, so realtime
+       alone never detects sam.ldb changes. Lower the scan frequency so the periodic
+       checksum scan catches them (~60s latency). -->
+  <frequency>60</frequency>
+  <!-- The REAL write target is the domain partition inside sam.ldb.d, NOT the top-level
+       sam.ldb stub (whose mtime never changes). -->
+  <directories check_all="yes" realtime="yes">/var/lib/samba/private/sam.ldb.d</directories>
 </syscheck>

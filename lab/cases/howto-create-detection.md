@@ -98,7 +98,14 @@ Three log sources on DC01, all shipping to manager agent `002` (`dc01`):
    `full_log` text patterns will fire TWICE per KDC line (log.samba + journald) — plan for
    dedup (`same_field`/frequency) or filter on `location`.
 
-4. FIM on `sam.ldb`: field `file` = `/var/lib/samba/private/sam.ldb` (as planned).
+4. FIM (UC-03b): the real write target is the **domain partition** `file` =
+   `/var/lib/samba/private/sam.ldb.d/DC=CORP,DC=LAB.ldb` — NOT the top-level `sam.ldb`
+   (a stub whose mtime never changes). `sam.ldb` is TDB: writes are mmap/msync, so mtime
+   updates but **inotify/realtime FIM never fires** — only the periodic checksum scan detects
+   the change. Config therefore uses `<frequency>60</frequency>` (near-realtime, ~60s latency)
+   and watches the `sam.ldb.d` directory. FIM event: `syscheck.path` =
+   `/var/lib/samba/private/sam.ldb.d/DC=CORP,DC=LAB.ldb`, `syscheck.event` = `modified`,
+   rule 550 (level 7). **Rule 100032's regex must match the `sam.ldb.d` path, not `sam.ldb`.**
 
 Samples: `lab/evidence/phase2-capture-*.json` (archive-format records, one JSON per line).
 
