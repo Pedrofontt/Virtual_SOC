@@ -48,10 +48,15 @@ Next: Phase 2 brainstorming (identity — DC01, S2, 11 GB).
    installer made plain ext4, no LVM resize needed; no gw route via 10.10.10.5 — SOC01 ip_forward=0
    and has no dnsmasq; DC01 DNS=127.0.0.1 set per plan; internet via NAT nic2 until detached).
    DC01: 10.10.10.10/24, ssh natpf 127.0.0.1:2222, creds in .local-credentials.md.
-4. NEXT: Task 5 capture step — user Steps 1-3 (WIN01 failed+success logon, DC01 sam.ldb write)
-   + assistant Steps 4-6 (export alerts, impacket TGS-REQ/AS-REP capture, field map, commit).
-   ~~Task 3~~ DONE (ff4ee55): impacket 0.13.1 + ldapdomaindump on SOC01 via wheel bootstrap.
-   ~~Task 4~~ DONE (8c21341): dc01 agent 002 active, json audit + log.samba + sam.ldb FIM shipping.
+4. Task 5 capture step — IN PROGRESS. ASSISTANT side DONE (2026-10-23): KDC log pipeline
+   fixed + verified end-to-end; capture artifacts committed to `lab/evidence/phase2-capture-*.json`
+   (tgs-req, asrep, kdc-authorization, logon-fail-interim); Samba decoded field map appended to
+   `lab/cases/howto-create-detection.md`; rsyslog conf repo-synced (v2 working).
+   USER steps still pending (Task 5 Steps 1-3): WIN01 failed+success logon, DC01 sam.ldb write —
+   then assistant exports -logon-ok/-samldb artifacts. NEXT: Tasks 6-9 (user-authored rules,
+   user-run attacks; assistant verifies). Key rule-authoring facts: fields are
+   `Authentication.*` / `KDC Authorization.*` (capital, space — NOT lowercase), log.samba lines
+   have no `message` field (match `full_log`), KDC lines arrive twice (log.samba + journald).
 
 ## Notes carried over
 
@@ -66,4 +71,13 @@ Next: Phase 2 brainstorming (identity — DC01, S2, 11 GB).
   UI path: Server Management → Rules → Manage rules files → local_rules.xml (pencil). NO raw quotes
   in regex text (API error 1113) — use \x22/\x27.
 - User runs the attack simulations themselves; I build/tune and verify (AGENTS.md rule).
+- ssh inside a piped remote script: `echo $b64 | base64 -d | bash` + any `ssh` call WITHOUT
+  `< /dev/null` silently consumes the rest of the script (ssh eats stdin). ALWAYS add
+  `< /dev/null` to ssh lines in remote scripts.
+- Indexer queries (no API token needed): curl -sku 'admin:<pw>' -H 'Content-Type: application/json'
+  -d '{"query":...}' https://127.0.0.1:9200/wazuh-alerts-4.x-*/_search (Wazuh API GET /events = 405).
+  Archives (all events, pre-rule) live in /var/ossec/logs/archives/archives.json (logall_json=yes);
+  rules at level >= 3 (log_alert_level) reach the indexer; level 1-2 only in archives.
+- DC01 hop from SOC01 needs `ssh -o BatchMode=yes dcadmin@10.10.10.10 "<cmd>"` + sudo via
+  `echo dcadmin123 | sudo -S`. Impacket runs FROM SOC01 (/usr/local/bin/*.py).
 - Docs: plan `docs/superpowers/plans/2026-10-12-phase0-1-detection-core.md`; runbooks `lab/runbook/{soc01,win01,setup}.md`; cases `lab/cases/*.md`; secrets `lab/runbook/.local-credentials.md` (gitignored).

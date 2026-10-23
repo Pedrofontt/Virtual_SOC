@@ -67,3 +67,38 @@ The exact process used for rule 100010 (UC-01). Follow it for every new detectio
 - Gotchas → `lab/cases/lessons-learned.md` (problem → symptom → root cause → fix).
 - Deploy commands → `lab/runbook/setup.md` new subsection.
 - Commit with a conventional message.
+
+## Phase 2 — Samba/KDC decoded field map (confirmed 2026-10-23, wazuh-logtest)
+
+Three log sources on DC01, all shipping to manager agent `002` (`dc01`):
+
+1. **`/var/log/samba/audit.json`** (localfile `log_format=json`) — decoder `json`.
+   JSON keys are preserved VERBATIM (case + spaces) as dynamic fields — do NOT lowercase:
+   - `Authentication.status`, `Authentication.eventId` (string, e.g. `"4624"`/`"4625"`),
+     `Authentication.logonType`, `Authentication.clientAccount`, `Authentication.clientDomain`,
+     `Authentication.remoteAddress`, `Authentication.serviceDescription` (`LDAP` | `Kerberos KDC`),
+     `Authentication.authDescription`, `Authentication.passwordType`, plus `type`, `timestamp`.
+   - KDC Authorization events (UC-04 signal): `KDC Authorization.status`, `.account`,
+     `.serviceDescription` (e.g. `MSSQLSvc/dc01.corp.lab:1433@CORP.LAB`),
+     `.authType` (`TGS-REQ with Ticket-Granting Ticket`), `.domain`, `.remoteAddress`,
+     `.logonServer`, `.authTime`.
+   NOTE: `type` discriminates the two shapes (`Authentication` vs `KDC Authorization`).
+
+2. **`/var/log/samba/log.samba`** (localfile `log_format=syslog`) — decoder is EMPTY (`{}`).
+   Only these fields exist: `full_log` (whole RFC3164-ized line, e.g.
+   `Oct 23 04:31:31 dc01 samba:    Kerberos: TGS-REQ SUCCESS ipv4:...`), `predecoder.program_name`
+   (`samba`), `predecoder.hostname`, `predecoder.timestamp`, `location`. There is NO `message`
+   field — rules must match on `full_log`.
+   UC-04: `TGS-REQ SUCCESS ... MSSQLSvc/...` ; UC-05 (adapted): `AS-REQ ERR_PREAUTH_REQUIRED
+   ... client-pa=128` + `Need\sto\suse\sPA-ENC-TIMESTAMP/PA-PK-AS-REQ`.
+
+3. **journald** (default localfile, `log_format=journald`) — Samba syslog ALSO lands here
+   (Debian 12: /dev/log belongs to journald). Same content as log.samba but RAW msg (no RFC3164
+   prefix, leading spaces), decoder empty, only `full_log` + predecoder. Rules matching
+   `full_log` text patterns will fire TWICE per KDC line (log.samba + journald) — plan for
+   dedup (`same_field`/frequency) or filter on `location`.
+
+4. FIM on `sam.ldb`: field `file` = `/var/lib/samba/private/sam.ldb` (as planned).
+
+Samples: `lab/evidence/phase2-capture-*.json` (archive-format records, one JSON per line).
+
