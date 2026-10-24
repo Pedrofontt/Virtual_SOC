@@ -105,7 +105,26 @@ Three log sources on DC01, all shipping to manager agent `002` (`dc01`):
    the change. Config therefore uses `<frequency>60</frequency>` (near-realtime, ~60s latency)
    and watches the `sam.ldb.d` directory. FIM event: `syscheck.path` =
    `/var/lib/samba/private/sam.ldb.d/DC=CORP,DC=LAB.ldb`, `syscheck.event` = `modified`,
-   rule 550 (level 7). **Rule 100032's regex must match the `sam.ldb.d` path, not `sam.ldb`.**
+    rule 550 (level 7). **Rule 100032's regex must match the `sam.ldb.d` path, not `sam.ldb`.**
+
+    **FIM rule-field gotcha (UC-03b, cost a full debugging loop):** the ALERT JSON shows the path
+    under `syscheck.path`, but RULE matching uses the *FIM field name* `file` — NOT `syscheck.path`.
+    The two are inconsistent by design (and `wazuh-logtest` disagrees with `analysisd` here, see
+    wazuh#26327). A FIM custom rule must therefore use:
+    ```xml
+    <rule id="100032" level="12">
+      <if_sid>550</if_sid>
+      <field name="file" type="pcre2">sam\.ldb\.d/DC=CORP,DC=LAB\.ldb</field>
+      <description>LAB: Active Directory database modified - $(file)</description>
+      <group>fim,lab,identity_attack,</group>
+      <mitre><id>T1565.001</id></mitre>
+    </rule>
+    ```
+    Use `if_sid 550` (child of "Integrity checksum changed") rather than `if_group syscheck` so the
+    rule only matches *modifications* of the target, not adds/deletes. Full FIM rule-field map:
+    `file`(path) `size`(size_after) `perm` `mode` `md5`/`sha1`/`sha256` `mtime`/`inode`
+    `changed_fields`(changed_attributes) `user_name`/`process_name` etc. In the description you may
+    reference either `$(syscheck.path)` (alert name) or `$(file)` (FIM name).
 
 Samples: `lab/evidence/phase2-capture-*.json` (archive-format records, one JSON per line).
 

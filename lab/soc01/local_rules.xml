@@ -25,4 +25,48 @@
     </mitre>
     <group>execution,sysmon_process_create,</group>
   </rule>
+
+  <rule id="100029" level="8">
+    <field name="Authentication.status" type="pcre2">^NT_STATUS_WRONG_PASSWORD$</field>
+    <description>LAB: failed domain logon - $(Authentication.clientAccount)@$(Authentication.clientDomain) from $(Authentication.remoteAddress)</description>
+    <group>authentication_failure,lab,identity_attack,</group>
+    <mitre><id>T1110</id></mitre>
+  </rule>
+
+  <rule id="100030" level="12" frequency="3" timeframe="60">
+    <if_matched_sid>100029</if_matched_sid>
+    <same_field>Authentication.remoteAddress</same_field>
+    <description>LAB: logon burst - 3+ failed logons in 60s from $(Authentication.remoteAddress)</description>
+    <group>authentication_failure,lab,identity_attack,</group>
+    <mitre><id>T1110</id></mitre>
+  </rule>
+
+  <rule id="100031" level="3">
+    <field name="Authentication.status" type="pcre2">^NT_STATUS_OK$</field>
+    <description>LAB: successful domain logon - $(Authentication.clientAccount)@$(Authentication.clientDomain) from $(Authentication.remoteAddress)</description>
+    <group>authentication_success,lab,</group>
+  </rule>
+
+  <rule id="100032" level="12">
+    <if_sid>550</if_sid>
+    <field name="file" type="pcre2">sam\.ldb\.d/DC=CORP,DC=LAB\.ldb</field>
+    <description>LAB: Active Directory database modified - $(file)</description>
+    <group>fim,lab,identity_attack,</group>
+    <mitre><id>T1565.001</id></mitre>
+  </rule>
+
+  <rule id="100033" level="12">
+    <field name="KDC Authorization.serviceDescription" type="pcre2">MSSQLSvc</field>
+    <description>LAB: Kerberoasting - TGS-REQ for $(KDC Authorization.serviceDescription) by $(KDC Authorization.account)</description>
+    <group>credential_access,lab,identity_attack,</group>
+    <mitre><id>T1558.003</id></mitre>
+  </rule>
+
+  <rule id="100034" level="12">
+    <match>AS-REQ ERR_PREAUTH_REQUIRED</match>
+    <description>LAB: AS-REP roasting attempt - AS-REQ without pre-authentication</description>
+    <group>credential_access,lab,identity_attack,</group>
+    <mitre><id>T1558.004</id></mitre>
+  </rule>
+
 </group>

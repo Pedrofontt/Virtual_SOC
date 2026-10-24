@@ -86,3 +86,19 @@ Written as problem -> symptom -> root cause -> fix. Setup commands live in `setu
 - 4.14.8 ships FIM rules referencing decoders that don't exist (fixed with stubs).
 - Windows agents: no second `<syscheck>` block; no per-directory frequency; realtime yes.
 - `scan_on_start` is silently baselined; realtime events drop while agent is disconnected.
+
+## Task 7 FIM rule (100032, AD DB modification)
+
+1. **FIM rule field is `file`, not `syscheck.path`.**
+   Problem: custom rule 100032 would not fire even though rule 550 fired for every modification.
+   Symptom: `grep`/`jq` of `alerts.json` showed rule 550 + `syscheck.path` =
+   `/var/lib/samba/private/sam.ldb.d/DC=CORP,DC=LAB.ldb`, but 0 alerts for 100032 across two rule
+   variants (`if_sid 550` + `<field name="syscheck.path">`; then `if_group syscheck` + the same field).
+   Root cause: the ALERT JSON nests the path under `syscheck.path`, but the rule engine matches FIM
+   fields by their *FIM* name, where the path is `file` (and size=`size`, mtime=`mtime`,
+   changed-attributes=`changed_fields`, …). `syscheck.path` simply does not exist as a rule-match field.
+   (Known Wazuh inconsistency: `wazuh-logtest` accepts `syscheck.path` but `analysisd` never matches it —
+   wazuh#26327.)
+   Fix: `<if_sid>550</if_sid>` + `<field name="file" type="pcre2">sam\.ldb\.d/DC=CORP,DC=LAB\.ldb</field>`.
+   Verified: re-triggered `samba-tool user setexpiry victim --days=90`, alert 100032 (level 12, T1565.001)
+   fired from agent `dc01`.
