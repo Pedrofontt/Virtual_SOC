@@ -35,8 +35,8 @@
 
   <rule id="100030" level="12" frequency="3" timeframe="60">
     <if_matched_sid>100029</if_matched_sid>
-    <same_field>Authentication.remoteAddress</same_field>
-    <description>LAB: logon burst - 3+ failed logons in 60s from $(Authentication.remoteAddress)</description>
+    <same_field>Authentication.mappedAccount</same_field>
+    <description>LAB: logon burst - 3+ failed logons in 60s for $(Authentication.mappedAccount)</description>
     <group>authentication_failure,lab,identity_attack,</group>
     <mitre><id>T1110</id></mitre>
   </rule>

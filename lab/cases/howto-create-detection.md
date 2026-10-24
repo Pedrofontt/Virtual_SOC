@@ -78,6 +78,10 @@ Three log sources on DC01, all shipping to manager agent `002` (`dc01`):
      `Authentication.logonType`, `Authentication.clientAccount`, `Authentication.clientDomain`,
      `Authentication.remoteAddress`, `Authentication.serviceDescription` (`LDAP` | `Kerberos KDC`),
      `Authentication.authDescription`, `Authentication.passwordType`, plus `type`, `timestamp`.
+   - Correlation gotcha (UC-03a): `Authentication.remoteAddress` is `ipv4:IP:<srcport>` — the port
+     changes per connection, so `same_field` on it never matches. And `clientAccount` is
+     `attacker@CORP` over Kerberos KDC but `attacker` over SMB2/NTLM. Use the normalized
+     `Authentication.mappedAccount` for `same_field` burst correlation (rule 100030).
    - KDC Authorization events (UC-04 signal): `KDC Authorization.status`, `.account`,
      `.serviceDescription` (e.g. `MSSQLSvc/dc01.corp.lab:1433@CORP.LAB`),
      `.authType` (`TGS-REQ with Ticket-Granting Ticket`), `.domain`, `.remoteAddress`,

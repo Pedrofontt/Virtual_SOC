@@ -102,3 +102,29 @@ Written as problem -> symptom -> root cause -> fix. Setup commands live in `setu
    Fix: `<if_sid>550</if_sid>` + `<field name="file" type="pcre2">sam\.ldb\.d/DC=CORP,DC=LAB\.ldb</field>`.
    Verified: re-triggered `samba-tool user setexpiry victim --days=90`, alert 100032 (level 12, T1565.001)
    fired from agent `dc01`.
+
+## Task 9 logon burst (100030, UC-03 re-verify)
+
+1. **`same_field` on `Authentication.remoteAddress` never matches (ephemeral port).**
+   Problem: rule 100030 correlated failed logons with `same_field Authentication.remoteAddress`.
+   Symptom: the burst never fired, even with 3 wrong-password attempts.
+   Root cause: Samba's `Authentication.remoteAddress` is `ipv4:10.10.10.20:<source-port>`, and the
+   source port changes on every connection — so the three events never share an identical value.
+   Fix: correlate on the normalized account instead — `same_field Authentication.mappedAccount`
+   (see next).
+
+2. **`clientAccount` differs between Kerberos and NTLM auth paths.**
+   Problem: after switching `same_field` to `Authentication.clientAccount`, the burst still did not fire.
+   Root cause: the same `attacker` logon is decoded as `clientAccount="attacker@CORP"` over Kerberos KDC
+   but `clientAccount="attacker"` over SMB2/NTLMSSP — the string differs, so `same_field` fails.
+   Fix: use `Authentication.mappedAccount`, which is normalized to plain `attacker` on both paths.
+   Verified: 3 failed logons (`\\dc01` Kerberos, `\\dc01.corp.lab` Kerberos, `\\10.10.10.10` NTLM)
+   -> alert 100030 (level 12, T1110) fired from agent `dc01`.
+
+3. **Windows negative-caches a failed credential per server name.**
+   Problem: from the domain-joined WIN01, `net use \\10.10.10.10\IPC$ /user:CORP\attacker wrongpass`
+   sent only ONE auth attempt; the 2nd/3rd returned cached "System error 1326" with no new 4625.
+   Root cause: the SMB redirector caches the failed-credential result keyed by server name (not cleared
+   by `net use * /delete`).
+   Fix: force fresh sessions by targeting the DC under three different names (`\\dc01`, `\\dc01.corp.lab`,
+   `\\10.10.10.10`). Each name = a distinct SMB session -> a fresh 4625. Documented in `lab/runbook/win01.md`.
