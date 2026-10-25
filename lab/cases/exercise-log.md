@@ -15,3 +15,10 @@
 | 2026-10-18 | UC-02 PS -enc run 1 (PS parent) | rule 100020 | 100020 lvl 12, 06:25:14Z | n/a |
 | 2026-10-18 | UC-02 PS -enc run 2 (cmd parent) | rule 100020 | 100020 lvl 12, 07:00:36Z | n/a |
 | 2026-10-18 | UC-02 benign (plain -Command, PS + cmd) | no 100020 | no 100020 | n/a |
+| 2026-10-24 | UC-03 failed logon | rule 100029 | 100029 fired (attacker@CORP, 10.10.10.20) | yes |
+| 2026-10-24 | UC-03 logon burst (3 fails) | rule 100030 | 100030 lvl 12 "3+ failed logons in 60s for attacker" 23:19:25Z | yes |
+| 2026-10-24 | UC-03 success | rule 100031 | 100031 fired (attacker@CORP) | n/a |
+| 2026-10-24 | UC-03b privileged group change (FIM) | rule 100032 | 100032 lvl 12 T1565.001 (sam.ldb.d modified) | yes (attacker removed from Domain Admins) |
+| 2026-10-24 | UC-03b benign (read-only samba-tool) | no 100032 | no 100032 | n/a |
+| 2026-10-24 | UC-04 Kerberoasting | rule 100033 | 100033 lvl 12 "TGS-REQ for MSSQLSvc/... by attacker" 04:01:52Z | yes |
+| 2026-10-24 | UC-05 AS-REP roasting | rule 100034 | 100034 lvl 12 (multiple; duplicate + normal-Kerberos FP noted) | yes |

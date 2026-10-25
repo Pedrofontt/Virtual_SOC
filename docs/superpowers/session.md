@@ -1,36 +1,33 @@
 # Session state — resume here
 
-Last updated: 2026-10-23 (session 11, post-savestate recovery). Resume by reading this file, then continue with "Next session — first steps" below.
+Last updated: 2026-10-24 (Phase 2 complete). Resume by reading this file, then continue with "Next session — first steps" below.
 
-## Where we are — MILESTONE 1 COMPLETE + UC-02 DONE
+## Where we are — PHASE 2 (identity) COMPLETE
 
-Phase 0–1 DONE. Three use cases PASS:
-- UC-00 FIM (rules 550/553/554 on C:\lab\critical realtime) — lab/cases/uc-00-fim.md
-- UC-01 T1003.001 LSASS dump (custom rule 100010, level 12) — lab/cases/uc-01-t1003-lsass.md
-- UC-02 T1059.001 PowerShell encoded command (custom rule 100020, level 12 — FIRST USER-CREATED RULE,
-  written via dashboard UI) — lab/cases/uc-02-t1059-powershell-enc.md
-Final gate G1 PASS: heap 53%, 2368 MB available, services active (yellow = accepted ISM shard state).
-Evidence: lab/evidence/milestone1-alerts.jsonl, uc-01-alert.png, uc-02-alert.png.
-Next: Phase 2 brainstorming (identity — DC01, S2, 11 GB).
+Phase 0–1 PASS (UC-00/01/02) + Phase 2 PASS (UC-03/03b/04/05):
+- UC-03 T1110 logon burst — rules 100029/100030/100031 — lab/cases/uc-03-t1110-logon-burst.md
+- UC-03b sam.ldb FIM (privileged group change) — rule 100032 — (folded into UC-03 + exercise log)
+- UC-04 T1558.003 Kerberoasting — rule 100033 — lab/cases/uc-04-t1558-003-kerberoasting.md
+- UC-05 T1558.004 AS-REP roasting — rule 100034 — lab/cases/uc-05-t1558-004-asrep.md (PASS w/ known FPs)
+Exit gate: UC-03 PASS (3 fails + success -> 100030 with endpoint IP + attacker@CORP.LAB identity);
+UC-04/05 PASS (bonus). Evidence: lab/evidence/uc-0{3,4,5}-alert.png.
+Next: Phase 3 NDR brainstorming.
 
 | Task | State |
 |---|---|
-| 1. Repo scaffolding | DONE |
-| 2. Host prep + SOC01 base VM | DONE |
-| 3. Wazuh all-in-one install + tuning + G1 | DONE |
-| 4. WIN01 Windows 11 install + fit tweaks | DONE |
-| 5. Sysmon + Wazuh agent enrollment | DONE |
-| 6. UC-00 FIM warm-up | DONE (PASS) |
-| 7. UC-01 T1003.001 LSASS access | DONE (PASS) |
-| 8. Milestone 1 wrap-up + final G1 | DONE (f8b036e) |
-| UC-02 T1059.001 PS -enc (user-created via UI) | DONE (PASS) |
+| 0–5 (Phase 2 infra + capture) | DONE |
+| 6. UC-03a logon rules 100029/100030/100031 | DONE (PASS) |
+| 7. UC-03b sam.ldb FIM rule 100032 | DONE (PASS) |
+| 8. UC-04/05 rules 100033/100034 | DONE (PASS) |
+| 9. WIN01 domain join + UC-03 re-verify | DONE (PASS) |
+| 10. Documentation + exit gate + close-out | DONE (this commit) |
 
 ## Current lab state
 
 - **SOC01**: RUNNING (headless). Rules 100010 + 100020 live + FIM decoder fix = detection baseline.
   UI rule editing proven end-to-end: save -> auto reload -> pscp back -> commit.
-- **WIN01**: RUNNING (headless), clean (pre-uc01 baseline — RunAsPPL=2, Defender on). UC-02 needed no
-  lab controls (benign payload only), no snapshot revert.
+- **WIN01**: RUNNING (headless), DOMAIN-JOINED to corp.lab (DESKTOP-I4QI720). Snapshots
+  `pre-domain-join` + `win01-joined`.
 - **Repo**: all committed. Evidence gap remaining: no dashboard screenshot for UC-00
   (uc-00-alert.png) — Discover `rule.id:550` still has the FIM alert in the 7-day index window if
   taken soon-ish. UC-01 Event Viewer EID 10 shot would need re-running the simulation.
@@ -39,27 +36,9 @@ Next: Phase 2 brainstorming (identity — DC01, S2, 11 GB).
 
 ## Next session — first steps
 
-1. ~~Phase 2 brainstorm/design/plan~~ DONE — spec `2026-10-18-phase2-identity-design.md` (f5e761a),
-   plan `2026-10-18-phase2-identity.md` (44d3c96). User authorized autonomous infra build (Tasks
-   0-5); Tasks 6-9 stay user-run.
-2. ~~Task 0 snapshots~~ DONE — base-phase1-fixed on both VMs; power outage hit mid-task; SOC01
-   recovered via full `wazuh-control restart` (stale wdb socket fixed), all services + API healthy.
-3. ~~Task 1 DC01 VM~~ DONE — unattended Ubuntu 24.04.5 install (user away; deviations from plan:
-   installer made plain ext4, no LVM resize needed; no gw route via 10.10.10.5 — SOC01 ip_forward=0
-   and has no dnsmasq; DC01 DNS=127.0.0.1 set per plan; internet via NAT nic2 until detached).
-   DC01: 10.10.10.10/24, ssh natpf 127.0.0.1:2222, creds in .local-credentials.md.
-4. ~~Task 5 capture step~~ DONE (2026-10-23, session 11). All five artifacts in
-   `lab/evidence/phase2-capture-{logon-fail,logon-ok,tgs-req,asrep,samldb}.json`. Field map +
-   FIM target corrected in `lab/cases/howto-create-detection.md`. NEXT: Tasks 6-9 (user-authored
-   rules 100029-100034, user-run attacks; assistant verifies after each).
-   Key rule-authoring facts (CONFIRMED this session):
-   - JSON audit fields are `Authentication.*` / `KDC Authorization.*` (capital + space, NOT
-     lowercase); `Authentication.eventId` is a STRING ("4624"/"4625").
-   - log.samba lines have EMPTY decoder -> match `full_log` (no `message` field).
-   - KDC lines arrive TWICE (log.samba RFC3164 + journald raw) -> dedup or filter `location`.
-   - **FIM target is `/var/lib/samba/private/sam.ldb.d/DC=CORP,DC=LAB.ldb`, NOT `sam.ldb`.**
-     TDB writes are mmap -> realtime inotify never fires; only periodic scan (frequency 60)
-     detects. Rule 100032 regex must match the `sam.ldb.d` path.
+Phase 2 DONE (all Tasks 0–10). Next: **Phase 3 NDR brainstorming** — run the brainstorming skill to
+design the next milestone before any build. No open Phase 2 items; 100034 FP/duplicate tuning is
+documented as future work (not blocking).
 
 ## Notes carried over
 
@@ -90,3 +69,14 @@ Next: Phase 2 brainstorming (identity — DC01, S2, 11 GB).
   resume; if wrong, `sudo timedatectl set-ntp off && sudo date -s <utc> && sudo hwclock -w --utc`,
   then `systemctl restart wazuh-manager`. WIN01 (Windows) self-syncs via VBox on boot, so only
   Linux VMs that resumed-from-savestate (not rebooted) are affected.
+- **FIM rule field is `file`, not `syscheck.path`.** The alert JSON nests the path under
+  `syscheck.path`, but the RULE engine matches the FIM field `file` (wazuh-logtest vs analysisd
+  disagreement, wazuh#26327). Custom FIM rule: `if_sid 550` + `<field name="file">`.
+- **Logon-burst correlation field = `Authentication.mappedAccount`.** `remoteAddress` includes the
+  ephemeral srcport (changes per connection -> `same_field` never matches) and `clientAccount` is
+  `attacker@CORP` (Kerberos) vs `attacker` (NTLM). `mappedAccount` is normalized on both paths.
+- **Windows negative-caches a failed credential per server name.** Repeated `net use \\IP\IPC$`
+  sends only one auth attempt; the rest return cached 1326. Force fresh 4625s by targeting the DC
+  under 3 names (`\\dc01`, `\\dc01.corp.lab`, `\\10.10.10.10`).
+- **Wazuh 4.14 rotates alerts/archives daily into `…/logs/{alerts,archives}/<year>/<Mon>/ossec-*-<day>.json(.gz)`.**
+  Yesterday's alerts are NOT in the live `alerts.json` — search the rotated file with `zgrep`.
