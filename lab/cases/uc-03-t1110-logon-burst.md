@@ -47,8 +47,8 @@ A single failed logon (or a success without 3 failures) does not fire 100030. `s
 - A legitimate account lockout (many wrong passwords) would also fire — acceptable signal.
 
 ## Cleanup
-`net use * /delete /y` removed the mapped connections. `attacker` removed from "Domain Admins" in
-Task 10 (it was added as the UC-03b privileged-group-change simulation).
+Intentionally **not** cleaned up — the lab is left attack-ready for study. `attacker` remains in
+"Domain Admins" (the UC-03b privileged-group-change state) so the simulation can be re-run.
 
 ## Troubleshooting notes
 - Windows negative-caches a failed credential per server name, so repeated identical `net use`

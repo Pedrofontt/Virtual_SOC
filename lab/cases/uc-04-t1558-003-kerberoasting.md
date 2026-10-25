@@ -34,7 +34,8 @@ Normal TGS-REQ for non-MSSQLSvc SPNs (host, cifs, etc.) do not match 100033.
   constraints or a frequency rule.
 
 ## Cleanup
-`attacker` removed from "Domain Admins" (Task 10). `svc-sql`/weak SPN left as documented lab config.
+Intentionally **not** cleaned up — lab kept attack-ready for study. `svc-sql`/weak SPN and
+`attacker` credentials remain as the documented lab config.
 
 ## Troubleshooting notes
 - Kerberoasting required impacket's AP-REQ authenticator checksum patch (Samba 4.19 KU 6 RC4
