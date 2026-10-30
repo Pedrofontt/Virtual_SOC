@@ -84,7 +84,7 @@ SIDs `7000001–7000007`. All targets are lab-internal. No public exploit traffi
 | 3 | `dst port 4444; flags:S; threshold: type threshold, track by_src, count 5, seconds 60;` |
 | 4 | `itype:8; dsize:>1000;` (normal ping ~32 B payload; tunneled ~1500 B) |
 | 5 | `dns.query; pcre:"/^.{40,}$/";` (long random-label FQDN, query sent to SOC01:53) |
-| 6 | `dst port 445; flow:established,to_server; threshold: type threshold, track by_src, count 10, seconds 30;` |
+| 6 | `dst port 445; flags:S; threshold: type threshold, track by_src, count 10, seconds 30;` |
 | 7 | `app-layer-protocol:ftp; content:"USER "; content:"PASS "; nocase;` |
 
 Exact pcre/threshold syntax is confirmed against Suricata 8 at build; the intent above is normative.
