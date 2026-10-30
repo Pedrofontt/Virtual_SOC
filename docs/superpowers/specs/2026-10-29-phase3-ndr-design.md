@@ -54,32 +54,36 @@ Phase 3 delivers the exit-gate marker plus a full suite of six real network dete
 | WIN01 | nmap for Windows (zip) | T1046 port scan |
 | WIN01 | beacon PowerShell script | T1571 beaconing |
 | WIN01 | DNS-exfil PowerShell script | T1071.004 DNS anomalies |
-| DC01 | `pyftpdlib` (pip) | T1040 cleartext FTP server |
+| SOC01 | `pyftpdlib` (pip) | T1040 cleartext FTP server |
 | NDR01 | Suricata PPA + package, Wazuh agent, `local.rules` | sensor |
+
+Notes:
+- impacket is already installed on SOC01 (Phase 2) — reused for UC-11 SMB brute force. No DC01 staging at all; **DC01 stays off for the whole phase (S3).**
+- All attack targets below are SOC01 (`10.10.10.5`) or WIN01 — never DC01 — because S3 keeps DC01 powered off.
 
 ## 4. Detection suite (7 rules)
 
 SIDs `7000001–7000007`. All targets are lab-internal. No public exploit traffic.
 
-| # | UC | Detection | Technique | Trigger (WIN01 → target) | Suricata rule logic |
+| # | UC | Detection | Technique | Trigger | Suricata rule logic |
 |---|---|---|---|---|---|
-| 1 | UC-06 | Marker | — | HTTP `User-Agent: lab-ndr-test` to SOC01 | `http.user_agent` content match |
-| 2 | UC-07 | Port scan | T1046 | nmap SYN sweep of DC01 | SYN threshold, `track by_src` |
-| 3 | UC-08 | Beaconing | T1571 | periodic connect to `10.10.10.5:4444` every ~10 s | connection threshold to non-standard dst port, `track by_src` |
-| 4 | UC-09 | ICMP tunneling | T1095 | oversized `ping -l` echo payload | `dsize` > threshold on ICMP echo |
-| 5 | UC-10 | DNS anomalies | T1071.004 | scripted long-label DNS queries to DC01 | `pcre` on `dns.query` (name length) |
-| 6 | UC-11 | SMB brute force | T1110 | repeated failed SMB auth to DC01:445 | SMB connection threshold, `track by_src` |
-| 7 | UC-12 | Cleartext protocol | T1040 | plaintext FTP `USER`/`PASS` to DC01 | `ftp` app-layer, `USER`/`PASS` content match |
+| 1 | UC-06 | Marker | — | WIN01 HTTP `User-Agent: lab-ndr-test` to SOC01 | `http.user_agent` content match |
+| 2 | UC-07 | Port scan | T1046 | WIN01 nmap SYN sweep of SOC01 | SYN threshold, `track by_src` |
+| 3 | UC-08 | Beaconing | T1571 | WIN01 periodic connect to `10.10.10.5:4444` every ~10 s | connection threshold to non-standard dst port, `track by_src` |
+| 4 | UC-09 | ICMP tunneling | T1095 | WIN01 oversized `ping -l` to SOC01 | `dsize` > threshold on ICMP echo |
+| 5 | UC-10 | DNS anomalies | T1071.004 | WIN01 scripted long-label DNS queries to SOC01:53 | `pcre` on `dns.query` (name length) |
+| 6 | UC-11 | SMB brute force | T1110 | SOC01 impacket repeated failed SMB auth to WIN01:445 | SMB connection threshold, `track by_src` |
+| 7 | UC-12 | Cleartext protocol | T1040 | WIN01 plaintext FTP `USER`/`PASS` to SOC01 (`pyftpdlib`) | `ftp` app-layer, `USER`/`PASS` content match |
 
 ### Rule intent (exact values validated at build)
 
 | # | Pinned parameters |
 |---|---|
 | 1 | `http.user_agent; content:"lab-ndr-test"; nocase;` |
-| 2 | `flags:S; threshold: type threshold, track by_src, count 20, seconds 5;` |
+| 2 | `flags:S; threshold: type threshold, track by_src, count 20, seconds 5;` (dst = SOC01) |
 | 3 | `dst port 4444; flags:S; threshold: type threshold, track by_src, count 5, seconds 60;` |
 | 4 | `itype:8; dsize:>1000;` (normal ping ~32 B payload; tunneled ~1500 B) |
-| 5 | `dns.query; pcre:"/^.{40,}$/";` (long random-label FQDN) |
+| 5 | `dns.query; pcre:"/^.{40,}$/";` (long random-label FQDN, query sent to SOC01:53) |
 | 6 | `dst port 445; flow:established,to_server; threshold: type threshold, track by_src, count 10, seconds 30;` |
 | 7 | `app-layer-protocol:ftp; content:"USER "; content:"PASS "; nocase;` |
 
@@ -99,9 +103,9 @@ Exact pcre/threshold syntax is confirmed against Suricata 8 at build; the intent
 
 ### Notes
 
-- UC-11 (SMB brute force) is the *network view* of the same attack Phase 2 catches in Samba logs — NDR proves the traffic pattern independent of host logs.
-- UC-12 needs `pyftpdlib` running on DC01; WIN01 logs in with a plaintext lab credential.
-- UC-11 reuses the Phase 2 "negative-cache per server name" workaround: target the DC under three names (`\\dc01`, `\\dc01.corp.lab`, `\\10.10.10.10`) to force fresh SMB auth attempts.
+- UC-11 (SMB brute force) runs from **SOC01 via impacket against WIN01:445** — it detects SMB brute force against a Windows endpoint, distinct from Phase 2's WIN01→DC01 logon detection. `track by_src` keys on SOC01 as the source; each impacket `smbclient` invocation opens a fresh connection (no negative-cache issue).
+- UC-12 needs `pyftpdlib` running on SOC01 (`10.10.10.5:21`); WIN01 logs in with a plaintext lab credential.
+- All other detections (UC-06/07/08/09/10) originate from WIN01 and target SOC01, keeping DC01 off.
 
 ## 5. Data flow
 
@@ -124,17 +128,17 @@ Phase 3 is a parallel source to Phase 1 (Sysmon) and Phase 2 (Samba auth JSON). 
 | UC | Pass | Benign control (must NOT fire) |
 |---|---|---|
 | UC-06 | marker alert visible in Wazuh | a normal browser request without the UA |
-| UC-07 | port-scan alert on nmap sweep | a few normal connections below threshold |
+| UC-07 | port-scan alert on nmap sweep of SOC01 | a few normal connections below threshold |
 | UC-08 | beacon alert on periodic connects | a single one-off connect to 4444 |
 | UC-09 | ICMP-tunnel alert on `ping -l 1500` | a normal `ping` (~32 B) |
-| UC-10 | DNS-anomaly alert on long-label queries | a normal `nslookup corp.lab` |
-| UC-11 | SMB brute-force alert on repeated fails | a single successful logon |
+| UC-10 | DNS-anomaly alert on long-label queries | a normal short DNS query to SOC01:53 |
+| UC-11 | SMB brute-force alert on repeated failed auth | a single successful SMB logon to WIN01 |
 | UC-12 | cleartext-FTP alert on USER/PASS | no plaintext FTP session |
 
 ### Simulation flow
 
 1. I build NDR01 + Suricata + Wazuh agent, verify G2.
-2. You stage/run each trigger from WIN01, one at a time.
+2. You stage/run each trigger one at a time (WIN01 for UC-06..UC-10/12; SOC01 impacket for UC-11).
 3. I confirm the alert in Wazuh, capture the evidence screenshot, then we move to the next.
 
 ## 7. G2 fallback — inline bridge
