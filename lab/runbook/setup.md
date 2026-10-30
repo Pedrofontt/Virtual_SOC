@@ -210,3 +210,94 @@ rundll32.exe C:\windows\System32\comsvcs.dll, MiniDump $lsassPid C:\lab\dumps\ls
 # Snapshot around test: VBoxManage snapshot WIN01 take pre-uc01  (before)  / restore (after).
 ```
 
+---
+
+## 3. DC01 — Samba Active Directory DC (Ubuntu 24.04.5)
+
+Domain controller for `corp.lab` / NetBIOS `CORP`. 2 vCPU / 4 GB RAM, plain ext4 (no LVM).
+Host key `SHA256:bt437mjTsTehLfEyzu+dinU7WnM4KDq1bhfeY6kxfK4`; ssh NAT port-forward `127.0.0.1:2222`.
+
+### 3.1 Create VM + disk (host)
+```powershell
+VBoxManage createvm --name DC01 --ostype Ubuntu_64 --register
+VBoxManage modifyvm DC01 --memory 4096 --cpus 2 --vram 16
+VBoxManage modifyvm DC01 --nic1 intnet --intnet1 int-corp --nic2 nat
+VBoxManage createmedium disk --filename C:\lab-vms\DC01\dc01.vdi --size 40960
+VBoxManage storagectl DC01 --name SATA --add sata --controller IntelAhci --bootable on
+VBoxManage storageattach DC01 --storagectl SATA --port 0 --device 0 --type hdd --medium C:\lab-vms\DC01\dc01.vdi
+VBoxManage storageattach DC01 --storagectl SATA --port 1 --device 0 --type dvddrive --medium C:\iso\ubuntu-24.04.5-live-server-amd64.iso
+VBoxManage startvm DC01
+```
+
+### 3.2 Install Ubuntu (interactive)
+Ubuntu Server 24.04.5 minimal, user `dcadmin`, enable OpenSSH (password auth). Full disk, no LVM.
+
+### 3.3 Static IP + free port 53
+```bash
+# netplan: enp0s3 -> 10.10.10.10/24, nameservers [127.0.0.1]  (the DC is its own DNS)
+sudo netplan apply
+sudo systemctl disable --now systemd-resolved   # systemd-resolved holds port 53; Samba DNS needs it
+```
+
+### 3.4 Provision Samba AD DC (the "create a domain" step)
+```bash
+sudo apt update && sudo apt install -y samba
+sudo samba-tool domain provision --use-rfc2307 --server-role=dc \
+  --dns-backend=SAMBA_INTERNAL --realm=corp.lab --domain=CORP --adminpass='<ADMINPW>'
+sudo systemctl unmask samba-ad-dc && sudo systemctl enable --now samba-ad-dc
+sudo systemctl mask smbd nmbd winbind     # AD DC runs as the 'samba' binary; these are not used
+```
+
+### 3.5 smb.conf additions (enable auth JSON + KDC debug to syslog)
+Append to `[global]` in `/etc/samba/smb.conf` (see `lab/dc01/smb.conf.additions.txt`):
+```
+log level = 1 auth_json_audit:3 kdc:10
+logging = syslog
+log file = /var/log/samba/log.samba
+dns forwarder = 192.168.100.1
+```
+Then `sudo systemctl restart samba-ad-dc`.
+
+### 3.6 Accounts + SPN + no-pre-auth flag
+```bash
+sudo samba-tool user create attacker 'Attacker!lab123'
+sudo samba-tool user create svc-sql  'SvcSQL!lab123'
+sudo samba-tool user create victim   'Victim!lab123'
+sudo samba-tool spn add MSSQLSvc/dc01.corp.lab:1433 svc-sql     # kerberoast target (weak SPN account)
+sudo samba-tool user setexpiry victim --noexpiry                # no password expiry
+# AS-REP roast target: add UF_DONT_REQUIRE_PREAUTH (0x400000) to victim's UAC (0x200 normal -> 4194816)
+sudo ldbmodify -H /var/lib/samba/private/sam.ldb --controls=relax:0 <<'EOF'
+dn: CN=victim,CN=Users,DC=corp,DC=lab
+changetype: modify
+replace: userAccountControl
+userAccountControl: 4194816
+EOF
+```
+
+### 3.7 Audit routing (rsyslog splits JSON vs text)
+Install `lab/dc01/rsyslog-samba-audit.conf` -> `/etc/rsyslog.d/30-samba-audit.conf`, then:
+```bash
+sudo chown syslog:adm /var/log/samba/log.samba && sudo chmod 664 /var/log/samba/log.samba
+# /etc/logrotate.d/samba: "create 640 root adm" -> "create 644 syslog adm"  (rsyslog must be able to re-create it)
+sudo rsyslogd -N1        # MUST validate; a bad filter makes rsyslog silently skip the file
+sudo systemctl restart rsyslog
+```
+
+### 3.8 Wazuh agent
+```bash
+# .deb is downloaded on the host and relayed host -> SOC01 -> DC01 (DC01 has no internet after isolation)
+sudo WAZUH_MANAGER='10.10.10.5' WAZUH_AGENT_NAME='dc01' dpkg -i ./wazuh-agent_4.14.8-1_amd64.deb
+sudo systemctl daemon-reload && sudo systemctl enable --now wazuh-agent
+```
+Append `lab/dc01/ossec.conf.additions.xml` before `</ossec_config>` in `/var/ossec/etc/ossec.conf`, then:
+```bash
+sudo systemctl restart wazuh-agent
+```
+
+### 3.9 Isolate + snapshot
+```powershell
+VBoxManage controlvm DC01 acpipowerbutton   # graceful shutdown
+VBoxManage modifyvm DC01 --nic2 none        # detach NAT
+VBoxManage snapshot DC01 take base-phase2   # provisioned AD DC, isolated, pre-agent
+```
+
