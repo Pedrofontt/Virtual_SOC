@@ -33,3 +33,10 @@ Phase 2 follow-up (2026-10-29, user hands-on + tuning):
 - 100034 tuned: match narrowed from `AS-REQ ERR_PREAUTH_REQUIRED` to `AS-REQ ERR_PREAUTH_REQUIRED.*victim[0-9]*@CORP` (was `victim[0-9]*@CORP\.LAB`, but Samba logs the NetBIOS realm form `victim@CORP` too, so `\.LAB` dropped). Verified: 20 victim/victim2 log.samba lines match, 0 machine-account lines match. Deployed to SOC01 local_rules.xml.
 - DC01 guest clock ran ~60x fast after savestate restore (tsc miscalibrated) -> Kerberos/LDAP broken. Fix: cold reboot + persist `clocksource=acpi_pm` via GRUB. Lesson added to lessons-learned.
 - Docs: setup.md §3 DC01 + dc01-walkthrough.md (commit 4b5823d). uc-05 + lessons-learned updated with tuning rationale.
+
+Phase 3 NDR — design + plan (2026-10-29, planning only, build not started):
+- Brainstorming complete. Design spec `docs/superpowers/specs/2026-10-29-phase3-ndr-design.md`; plan `docs/superpowers/plans/2026-10-29-phase3-ndr.md` (15 tasks). Commits `04d1c5d` + `fce9592`.
+- Locked decisions: full suite (marker UC-06 + 6 detections UC-07..12: T1046/T1571/T1095/T1071.004/T1110/T1040); custom-only ruleset (no ET); passive capture first (G2 gate) with bridge fallback; S3 power-on (DC01 OFF all phase).
+- KEY DEVIATION from first draft: DC01 must stay off in S3 (12 GB > 11 GB ceiling if all 4 guests on). SMB brute force (T1110) retargeted to SOC01→WIN01:445 via impacket; port scan/ICMP/DNS/FTP retargeted to SOC01. Design spec was updated to match before plan.
+- Mapping: Suricata sids 7000001–7000007 ↔ Wazuh rules 100040–100046 (field `alert.signature_id`). NDR01: 1 vCPU/1 GB/15 GB, 10.10.10.40, agent 003, ndradmin/ndradmin123.
+- Next: execute plan (subagent-driven recommended), Task 0 first; Task 1 is interactive user step.
