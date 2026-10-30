@@ -63,7 +63,7 @@
   </rule>
 
   <rule id="100034" level="12">
-    <match>AS-REQ ERR_PREAUTH_REQUIRED.*victim[0-9]*@CORP\.LAB</match>
+    <match>AS-REQ ERR_PREAUTH_REQUIRED.*victim[0-9]*@CORP</match>
     <description>LAB: AS-REP roasting attempt - pre-auth-less AS-REQ for a no-pre-auth account (UF_DONT_REQUIRE_PREAUTH)</description>
     <group>credential_access,lab,identity_attack,</group>
     <mitre><id>T1558.004</id></mitre>

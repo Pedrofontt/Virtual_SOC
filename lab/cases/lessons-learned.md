@@ -128,3 +128,30 @@ Written as problem -> symptom -> root cause -> fix. Setup commands live in `setu
    by `net use * /delete`).
    Fix: force fresh sessions by targeting the DC under three different names (`\\dc01`, `\\dc01.corp.lab`,
    `\\10.10.10.10`). Each name = a distinct SMB session -> a fresh 4625. Documented in `lab/runbook/win01.md`.
+
+## UC-05 AS-REP (100034) tuning
+
+1. **An over-broad KDC match fires on normal Kerberos activity.**
+   Problem: original rule `<match>AS-REQ ERR_PREAUTH_REQUIRED</match>`.
+   Symptom: 100034 fired on every Kerberos logon, not just AS-REP roasting.
+   Root cause: every Kerberos logon starts with an AS-REQ sent WITHOUT pre-auth; the KDC's
+   `ERR_PREAUTH_REQUIRED` response is part of the normal TGT exchange, not an attack.
+   Fix: anchor the match to the no-pre-auth accounts — `AS-REQ ERR_PREAUTH_REQUIRED.*victim[0-9]*@CORP`.
+
+2. **Samba logs the same account in two realm spellings.**
+   Problem: after tightening to `victim[0-9]*@CORP\.LAB`, the rule still missed some victim lines.
+   Symptom: `log.samba` showed both `victim@CORP.LAB` (FQDN) and `victim@CORP` (NetBIOS) for the
+   same no-pre-auth account.
+   Root cause: the client can request under either the DNS realm or the NetBIOS domain name, and Samba
+   logs whichever form the client used. Anchoring on `\.LAB` dropped the NetBIOS form (4 of 20 lines).
+   Fix: match `victim[0-9]*@CORP` (no `\.LAB`). Still excludes `DESKTOP-I4QI720$` (no `victim` substring).
+
+3. **DC01 guest clock can run ~60x fast after a savestate restore.**
+   Problem: DC01's system clock jumped ~6 hours in ~6 minutes, breaking Kerberos (needs clocks within
+   5 min) and making `GetNPUsers.py` fail its LDAP search (`noSuchObject: acl_read: Error retrieving
+   instanceType for base`).
+   Root cause: the VM was restored from a VirtualBox saved state, leaving the `tsc` clock source
+   miscalibrated. `timedatectl set-time` only lasts seconds before the clock races ahead again.
+   Fix: cold reboot the VM (full power-off -> start) to recalibrate; then persist
+   `clocksource=acpi_pm` via GRUB (`GRUB_CMDLINE_LINUX_DEFAULT=... clocksource=acpi_pm` + update-grub)
+   so it survives future reboots. The `acpi_pm` source is stable where `tsc` was not.
