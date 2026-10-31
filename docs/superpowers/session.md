@@ -1,8 +1,10 @@
 # Session state — resume here
 
-Last updated: 2026-10-29 (Phase 3 NDR design + plan COMPLETE, build not started). Resume by reading this file, then continue with "Next session — first steps" below.
+Last updated: 2026-10-29 (Phase 3 NDR BUILD IN PROGRESS — Task 0 done, starting Task 1). Resume by reading this file, then continue with "Next session — first steps" below.
 
-## Where we are — PHASE 3 NDR: DESIGNED & PLANNED (ready to build)
+## Where we are — PHASE 3 NDR: BUILD IN PROGRESS (Task 0 complete)
+
+Phase 3 NDR build started. Task 0 pre-flight done: DC01 powered off (S3), SOC01+WIN01 running and healthy, WIN01 snapshot `pre-uc06` taken. Next: Task 1 (create NDR01 VM + interactive Ubuntu install, needs user present).
 
 Phases 0–1 PASS + Phase 2 PASS. Phase 3 NDR is fully designed and planned, **nothing built yet**.
 
@@ -36,7 +38,7 @@ Detection suite (full details in design §4):
 ## Current lab state
 
 - **SOC01**: RUNNING (headless). Rules 100010 + 100020 + 100029–100034 live. impacket installed (`/usr/local/lib/python3.12/dist-packages/examples/`). Clock fixed.
-- **WIN01**: RUNNING (headless), DOMAIN-JOINED. Snapshots `pre-domain-join`, `win01-joined`, `base-phase1-fixed`. **`pre-uc06` snapshot NOT yet taken** (that's Task 0 Step 3).
+- **WIN01**: RUNNING (headless), DOMAIN-JOINED. Snapshots `pre-domain-join`, `win01-joined`, `base-phase1-fixed`, **`pre-uc06`** (Phase 3 rollback point).
 - **DC01**: POWERED OFF (correct — Phase 3 needs it off).
 - **NDR01**: does not exist yet (Task 1).
 - **Repo**: all committed. HEAD = `fce9592`.
