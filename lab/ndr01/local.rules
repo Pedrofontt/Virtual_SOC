@@ -1,0 +1,14 @@
+# UC-06 marker
+alert http any any -> any any (msg:"LAB NDR marker - lab-ndr-test UA"; flow:established,to_server; http.user_agent; content:"lab-ndr-test"; nocase; classtype:trojan-activity; sid:7000001; rev:1;)
+# UC-07 port scan
+alert tcp any any -> any any (msg:"LAB NDR - TCP port scan"; flags:S; threshold:type threshold, track by_src, count 20, seconds 5; classtype:attempted-recon; sid:7000002; rev:1;)
+# UC-08 beaconing
+alert tcp any any -> any 4444 (msg:"LAB NDR - beaconing non-standard port"; flags:S; threshold:type threshold, track by_src, count 5, seconds 60; classtype:bad-unknown; sid:7000003; rev:1;)
+# UC-09 ICMP tunneling
+alert icmp any any -> any any (msg:"LAB NDR - ICMP tunneling"; itype:8; dsize:>1000; classtype:bad-unknown; sid:7000004; rev:1;)
+# UC-10 DNS anomaly
+alert dns any any -> any 53 (msg:"LAB NDR - DNS anomaly"; dns.query; pcre:"/^.{40,}$/"; classtype:bad-unknown; sid:7000005; rev:1;)
+# UC-11 SMB brute force
+alert tcp any any -> any 445 (msg:"LAB NDR - SMB brute force"; flags:S; threshold:type threshold, track by_src, count 10, seconds 30; classtype:bad-unknown; sid:7000006; rev:1;)
+# UC-12 cleartext FTP
+alert ftp any any -> any any (msg:"LAB NDR - cleartext FTP creds"; flow:established,to_server; content:"USER "; nocase; content:"PASS "; nocase; classtype:policy-violation; sid:7000007; rev:1;)

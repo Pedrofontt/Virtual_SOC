@@ -1,0 +1,44 @@
+# NDR01 Suricata config additions (suricata.yaml)
+#
+# Applied to /etc/suricata/suricata.yaml (Suricata 8.0.8, OISF stable PPA).
+# Only these keys differ from the shipped default. Repo copy for rebuild reference.
+
+# 1. HOME_NET (vars/address-groups)
+vars:
+  address-groups:
+    HOME_NET: "[10.10.10.0/24]"
+
+# 2. af-packet — capture enp0s3 (int-corp NIC) in passive mode
+af-packet:
+  - interface: enp0s3
+    defrag: yes
+    use-mmap: yes
+    tpacket-v3: yes
+    cluster-id: 99
+    cluster-type: cluster_flow
+
+# 3. ruleset — custom-only (default-rule-path + rule-files)
+default-rule-path: /etc/suricata/rules
+rule-files:
+  - local.rules
+
+# 4. eve.json output types (added ftp + flow; alert/http/dns/smb/stats already enabled by default)
+outputs:
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: eve.json
+      types:
+        - alert
+        - http
+        - dns
+        - smb
+        - ftp
+        - flow
+        - stats
+
+# Notes:
+# - `defrag: yes` under af-packet triggers a benign "Configuration node 'defrag' redefined"
+#   warning (top-level `defrag:` section also exists). Harmless; config loads clean.
+# - SYN-only rules 7000003/7000006 emit "disabling for toclient direction" warnings;
+#   expected — they only match toserver SYN connection attempts.
