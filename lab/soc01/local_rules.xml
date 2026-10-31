@@ -1,4 +1,4 @@
-<!-- Local rules -->
+﻿<!-- Local rules -->
 <!-- Modify it at your will. -->
 <!-- Copyright (C) 2015, Wazuh Inc. -->
 
@@ -68,5 +68,45 @@
     <group>credential_access,lab,identity_attack,</group>
     <mitre><id>T1558.004</id></mitre>
   </rule>
-
+  <rule id="100040" level="8">
+    <field name="alert.signature_id">7000001</field>
+    <description>LAB NDR: marker - lab-ndr-test User-Agent</description>
+    <group>ndr,lab,</group>
+  </rule>
+  <rule id="100041" level="10">
+    <field name="alert.signature_id">7000002</field>
+    <description>LAB NDR: TCP port scan</description>
+    <group>ndr,lab,discovery,</group>
+    <mitre><id>T1046</id></mitre>
+  </rule>
+  <rule id="100042" level="12">
+    <field name="alert.signature_id">7000003</field>
+    <description>LAB NDR: beaconing to non-standard port</description>
+    <group>ndr,lab,command_and_control,</group>
+    <mitre><id>T1571</id></mitre>
+  </rule>
+  <rule id="100043" level="12">
+    <field name="alert.signature_id">7000004</field>
+    <description>LAB NDR: ICMP tunneling</description>
+    <group>ndr,lab,exfiltration,</group>
+    <mitre><id>T1095</id></mitre>
+  </rule>
+  <rule id="100044" level="12">
+    <field name="alert.signature_id">7000005</field>
+    <description>LAB NDR: DNS anomaly (tunneling)</description>
+    <group>ndr,lab,exfiltration,</group>
+    <mitre><id>T1071.004</id></mitre>
+  </rule>
+  <rule id="100045" level="12">
+    <field name="alert.signature_id">7000006</field>
+    <description>LAB NDR: SMB brute force</description>
+    <group>ndr,lab,credential_access,</group>
+    <mitre><id>T1110</id></mitre>
+  </rule>
+  <rule id="100046" level="10">
+    <field name="alert.signature_id">7000007</field>
+    <description>LAB NDR: cleartext FTP credentials</description>
+    <group>ndr,lab,credential_access,</group>
+    <mitre><id>T1040</id></mitre>
+  </rule>
 </group>
