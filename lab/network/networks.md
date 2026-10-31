@@ -17,11 +17,12 @@ Two VirtualBox networks. No bridged adapters. No DHCP on lab networks. All IPs s
 | SOC01 nic1 | 10.10.10.5 | Agent events :1514, enrollment :1515 |
 | WIN01 | 10.10.10.20 | Endpoint (Sysmon + Wazuh agent) |
 | DC01 (phase 2) | 10.10.10.10 | Samba AD DC + DNS, domain corp.lab |
-| NDR01 (phase 3) | 10.10.10.40 | Suricata sensor; bridge model on gate G2 failure |
+| NDR01 (phase 3) | 10.10.10.40 | Suricata sensor; NIC1 int-corp promisc allow-all (passive sniff); bridge model on gate G2 failure |
 | SRV01 (phase 5) | 10.10.10.30 | Reserved, not built |
 
 ## Guest NICs
 
 - SOC01: host-only + int-corp + NAT (NAT detached after Task 3 checklist)
 - WIN01: int-corp + NAT (NAT detached after Task 5 checklist)
+- NDR01: int-corp (NIC1, promisc allow-all) + NAT (NIC2, detached after build)
 - NAT adapters are for package installs only. When detached, the lab has no Internet path.
