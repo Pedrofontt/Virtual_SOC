@@ -1,0 +1,59 @@
+{
+  "purpose": "Phase 3 G2 capture gate + marker field-name capture (Task 4)",
+  "result": "G2 PASS - NDR01 passive promiscuous capture confirmed; marker sid 7000001 reached Wazuh",
+  "wazuh_field_for_sid": "alert.signature_id",
+  "captured_event": {
+    "timestamp": "2026-10-31T02:42:28.209648+0000",
+    "agent": "ndr01",
+    "location": "/var/log/suricata/eve.json",
+    "decoder": "json",
+    "data": {
+      "timestamp": "2026-10-31T02:42:28.209648+0000",
+      "flow_id": "1315774329701805.000000",
+      "in_iface": "enp0s3",
+      "event_type": "alert",
+      "src_ip": "10.10.10.20",
+      "src_port": "57141",
+      "dest_ip": "10.10.10.5",
+      "dest_port": "80",
+      "proto": "TCP",
+      "ip_v": "4",
+      "pkt_src": "wire/pcap",
+      "tx_id": "0",
+      "alert": {
+        "action": "allowed",
+        "gid": "1",
+        "signature_id": "7000001",
+        "rev": "1",
+        "signature": "LAB NDR marker - lab-ndr-test UA",
+        "category": "A Network Trojan was detected",
+        "severity": "1"
+      },
+      "ts_progress": "request_complete",
+      "tc_progress": "response_complete",
+      "http": {
+        "hostname": "10.10.10.5",
+        "url": "/",
+        "http_user_agent": "lab-ndr-test",
+        "http_content_type": "text/html",
+        "http_method": "GET",
+        "protocol": "HTTP/1.1",
+        "status": "200",
+        "length": "714"
+      },
+      "app_proto": "http",
+      "direction": "to_server",
+      "flow": {
+        "pkts_toserver": "4",
+        "pkts_toclient": "4",
+        "bytes_toserver": "326",
+        "bytes_toclient": "1103",
+        "start": "2026-10-31T02:42:28.175280+0000",
+        "src_ip": "10.10.10.20",
+        "dest_ip": "10.10.10.5",
+        "src_port": "57141",
+        "dest_port": "80"
+      }
+    }
+  }
+}
