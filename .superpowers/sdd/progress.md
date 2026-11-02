@@ -40,3 +40,60 @@ Phase 3 NDR — design + plan (2026-10-29, planning only, build not started):
 - KEY DEVIATION from first draft: DC01 must stay off in S3 (12 GB > 11 GB ceiling if all 4 guests on). SMB brute force (T1110) retargeted to SOC01→WIN01:445 via impacket; port scan/ICMP/DNS/FTP retargeted to SOC01. Design spec was updated to match before plan.
 - Mapping: Suricata sids 7000001–7000007 ↔ Wazuh rules 100040–100046 (field `alert.signature_id`). NDR01: 1 vCPU/1 GB/15 GB, 10.10.10.40, agent 003, ndradmin/ndradmin123.
 - Next: execute plan (subagent-driven recommended), Task 0 first; Task 1 is interactive user step.
+
+Phase 3 NDR — build + verification (2026-10-30/31, executing):
+- Task 0: complete (DC01 off, SOC01+WIN01 healthy, WIN01 snapshot `pre-uc06`). Commit 6180240.
+- Task 1: complete (NDR01 VM + Ubuntu 24.04, static 10.10.10.40/24 on int-corp NIC1 promisc allow-all,
+  NIC2 NAT ssh fwd 127.0.0.1:2223; ndradmin/ndradmin123; GRUB `clocksource=acpi_pm`; RAM bumped 1→2 GB
+  after 1 GB froze install — MUST drop back to 1 GB in Task 14). Commit 23410f5.
+- Task 2: complete (Suricata 8.0.8 OISF PPA; Wazuh agent 4.14.8 enrolled as ndr01/003; eve.json localfile;
+  ossec.conf manager IP). 
+- Task 3: complete (Suricata configured: af-packet enp0s3, HOME_NET 10.10.10.0/24, 7 local.rules sids
+  7000001-7000007, eve.json types alert/http/dns/smb/ftp/flow/stats). Commit 6927f98.
+- Task 4: complete (G2 capture gate PASS — passive promiscuous capture works, no bridge). Marker field
+  confirmed `alert.signature_id`. Commit d153a80.
+- Task 5: complete (user authored rules 100040-100046 via dashboard; synced to repo). Commit d5851db.
+- Task 6: complete (tools staged: WIN01 beacon.ps1/dns-exfil.ps1/port-scan.ps1 at C:\lab\;
+  SOC01 mini_ftpd.py replacing pyftpdlib 2.2.0 which is incompatible with Python 3.12 asynchat).
+  Commit df775fc.
+- **ROOT CAUSE (custom rules fired nothing) + FIX**: Wazuh built-in Suricata chain 86600→86601 consumes
+  eve.json `alert` events, so top-level custom rules never matched. Fix: `<if_sid>86601</if_sid>` +
+  `<field name="alert.signature_id" type="pcre2">^700000N$</field>` on all 7 rules. Verified via
+  wazuh-logtest + end-to-end marker→100040. Commit 3ded236.
+- Task 7 (UC-06 marker): PASS — 100040 lvl 8 fires on `lab-ndr-test` UA; benign (default PowerShell UA)
+  silent. Verified dashboard + alerts.json + eve.json.
+- **Clock fix (blocked UC visibility)**: SOC01 clock ~27 h behind (no NTP) → alerts stamped in past →
+  dashboard default window hid them ("nothing on dashboard"). Fixed `timedatectl set-ntp off` +
+  `set-time` to real UTC. Re-fire after fix.
+- Task 8 (UC-07 port scan, T1046): PASS — port-scan.ps1 (60 SYNs) → 7000002 → 100041 lvl 10.
+  Benign (single Test-NetConnection to open 1514) silent.
+- Task 9 (UC-08 beaconing, T1571): PASS — beacon.ps1 → 7000003 → 100042 lvl 12. **DEVIATION**: plan's
+  benign control `Test-NetConnection -Port 4444` retransmits SYN ~5× (closed port) and trips the
+  count-5/60s threshold (false positive). Replaced with single non-blocking BeginConnect SYN
+  (`pkts_toserver:1`, alerted:false). Noted for docs.
+- Task 10 (UC-09 ICMP, T1095): PASS — `ping -n 3 -l 1200` → 7000004 → 100043 lvl 12
+  (2026-11-01T05:01:55Z, src 10.10.10.20→10.10.10.5, ICMP). Benign 32-byte ping silent.
+- Task 11 (UC-10 DNS, T1071.004): PASS — `dns-exfil.ps1` → 7000005 → 100044 lvl 12
+  (05:09:59Z, UDP 10.10.10.20→10.10.10.5:53). Benign `nslookup corp.lab` silent.
+- Task 12 (UC-11 SMB, T1110): PASS — impacket ×12 → 7000006 → 100045 lvl 12
+  (2026-11-02T01:42:38Z, src 10.10.10.5→10.10.10.20:445). **Lab controls**: opened 445 on WIN01
+  (default filtered); used non-existent local user `nosuchuser` to avoid re-locking a real account;
+  fired 12 attempts CONCURRENTLY (Windows SMB rate-limiter ~2s/failure defeats sequential);
+  recovered an accidental `labadmin` lockout via `pre-uc06` snapshot restore. Benign single
+  successful logon silent.
+- Task 13 (UC-12 FTP, T1040): PASS — WIN01 `ftp` → SOC01:21 → 7000007 → 100046 lvl 10
+  (01:54:03Z). pyftpdlib 2.2.0 is incompatible with Python 3.12 (asynchat/asyncore) → replaced by
+  `mini_ftpd.py` (repo `lab/soc01/mini_ftpd.py`). Suricata `ftp_flow:1 ftp_tx:5`. Benign silent
+  by construction.
+- Task 14 (close-out): complete — 7 case docs (uc-06..uc-12), exercise-log rows, 8 new
+  lessons-learned entries, `ndr01-walkthrough.md` + `setup.md` §4, evidence
+  `lab/evidence/phase3-alerts.json`. NDR01 NAT detached + RAM 1 GB + snapshot `base-phase3`
+  (clock + Suricata + wazuh-agent re-verified after headless reboot). session.md updated.
+  Final commit pending.
+
+Phase 3 follow-up notes (2026-11-02, user hands-on):
+- Clock drift recurred: after the host was off/sleeping, SOC01 + NDR01 were ~18 h behind real
+  time (Linux VMs stall; WIN01 stays synced via Guest Additions). Fixed both; lesson recorded.
+- UC-11 re-run required opening 445 and concurrent impacket attempts; first sequential run locked
+  `labadmin` (realistic T1110 impact) — recovered via `pre-uc06` snapshot restore.
+- NDR01 reachability changed: NAT (127.0.0.1:2223) is detached, so NDR01 is now SOC01-hop only.

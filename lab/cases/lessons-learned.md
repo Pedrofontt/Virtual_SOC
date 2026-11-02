@@ -155,3 +155,52 @@ Written as problem -> symptom -> root cause -> fix. Setup commands live in `setu
    Fix: cold reboot the VM (full power-off -> start) to recalibrate; then persist
    `clocksource=acpi_pm` via GRUB (`GRUB_CMDLINE_LINUX_DEFAULT=... clocksource=acpi_pm` + update-grub)
    so it survives future reboots. The `acpi_pm` source is stable where `tsc` was not.
+
+## Phase 3 NDR (UC-06..UC-12)
+
+1. **Custom Suricata rules never fired — the Wazuh rule must be a child of 86601.**
+   Problem: top-level custom rules keyed on `event_type:alert` never matched eve.json alerts.
+   Root cause: Wazuh's built-in Suricata chain 86600→86601 already consumes eve.json `alert`
+   events, so a top-level rule has no event left to match.
+   Fix: every rule is a child of 86601 (`<if_sid>86601</if_sid>`) keyed on
+   `<field name="alert.signature_id" type="pcre2">^700000N$</field>` — the field is
+   `alert.signature_id` (dotted, NO `data.` prefix), and it is a STRING in the Wazuh alert
+   (numeric in Suricata eve.json).
+
+2. **Promiscuous capture is verified by the G2 tcpdump gate, never assumed.**
+   The NDR sensor depends on VirtualBox NIC1 promisc "allow-all". This is only trusted
+   because the G2 gate captured a tcpdump from WIN01/SOC01 traffic it should not otherwise see.
+
+3. **Linux VMs stall their clock when the host is off; Windows follows the host.**
+   Symptom: after the host was off/sleeping, SOC01 and NDR01 were ~18 h behind real time while
+   WIN01 was correct. Root cause: Linux (no NTP) uses the VM RTC which froze; WIN01 gets
+   Guest-Additions time sync from the host. Fix: `timedatectl set-ntp off` + `set-time` on
+   SOC01/NDR01 after every resume, then restart Suricata (its flow/threshold state is stale).
+
+4. **`smbclient.py` hangs forever against a filtered 445.**
+   Symptom: impacket `smbclient.py` to WIN01:445 produced no output and never returned when
+   SMB was firewalled (`connect_ex=11`, SYN sent, no reply). Root cause: no SYN-ACK → connect
+   retries/timeouts. Fix: open 445 (`Set-NetFirewallRule -DisplayGroup "File and Printer Sharing"
+   -Enabled True`, elevated) — then login attempts fail fast with `STATUS_LOGON_FAILURE`.
+
+5. **A real SMB brute force locks the target account.**
+   Symptom: 12 failed `labadmin` logins → `STATUS_ACCOUNT_LOCKED_OUT` on all later attempts and
+   broke `guestcontrol` (session auth fails). Root cause: effective account-lockout threshold.
+   Fix: brute-force a NON-EXISTENT local user (`nosuchuser`) so no real account locks; recover
+   a locked account by restoring a pre-lockout snapshot. (Documented as a lab control.)
+
+6. **Windows' SMB auth rate-limiter defeats a sequential SYN-count trigger.**
+   Symptom: 12 sequential `smbclient.py` runs were too slow to reach 10 SYNs in 30 s.
+   Root cause: the SMB server delays each failed auth ~2 s, so per-invocation startup + delay
+   spread the SYNs beyond the threshold window. Fix: fire the 12 logins CONCURRENTLY (threads)
+   in one process — 12 SYNs in ~1 s.
+
+7. **pyftpdlib 2.2.0 is broken on Python 3.12.**
+   Symptom: `import pyftpdlib` fails — it imports `asynchat`/`asyncore`, removed in 3.12.
+   Fix: `mini_ftpd.py` (repo `lab/soc01/mini_ftpd.py`), a minimal RFC-959 USER/PASS/QUIT server
+   that the Windows `ftp.exe` client and Suricata's FTP parser both accept.
+
+8. **eve.json signature_id is a number; Wazuh alert field is a string.**
+   `grep '"signature_id":7000006' eve.json` matches nothing because Suricata emits
+   `"signature_id": 7000006` (numeric, optional space). Grep loose (`7000006`) or jq the number;
+   in Wazuh alerts it is the string `"7000006"`.

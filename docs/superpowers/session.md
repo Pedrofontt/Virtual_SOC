@@ -1,69 +1,57 @@
 # Session state — resume here
 
-Last updated: 2026-10-29 (Phase 3 NDR BUILD IN PROGRESS — Task 0 done, starting Task 1). Resume by reading this file, then continue with "Next session — first steps" below.
+Last updated: 2026-11-02 (Phase 3 NDR **COMPLETE** — all 7 detections verified PASS, close-out done). Resume by reading this file; next is Phase 4 SOAR.
 
-## Where we are — PHASE 3 NDR: BUILD IN PROGRESS (Task 0 complete)
+## Where we are — PHASE 3 NDR: COMPLETE
 
-Phase 3 NDR build started. Task 0 pre-flight done: DC01 powered off (S3), SOC01+WIN01 running and healthy, WIN01 snapshot `pre-uc06` taken. Next: Task 1 (create NDR01 VM + interactive Ubuntu install, needs user present).
+All 7 detections verified end-to-end (Suricata eve.json → agent 003 → SOC01 manager → custom rule):
 
-Phases 0–1 PASS + Phase 2 PASS. Phase 3 NDR is fully designed and planned, **nothing built yet**.
+| UC | MITRE | Status | Trigger | sid → rule |
+|---|---|---|---|---|
+| UC-06 marker | — | **PASS** | `Invoke-WebRequest` UA `lab-ndr-test` → SOC01 | 7000001 → 100040 lvl 8 |
+| UC-07 port scan | T1046 | **PASS** | `C:\lab\port-scan.ps1` (60 SYNs) | 7000002 → 100041 lvl 10 |
+| UC-08 beaconing | T1571 | **PASS** | `C:\lab\beacon.ps1` (SYNs to :4444) | 7000003 → 100042 lvl 12 |
+| UC-09 ICMP tunnel | T1095 | **PASS** | `ping -n 3 -l 1200 10.10.10.5` | 7000004 → 100043 lvl 12 |
+| UC-10 DNS anomaly | T1071.004 | **PASS** | `C:\lab\dns-exfil.ps1` → SOC01:53 | 7000005 → 100044 lvl 12 |
+| UC-11 SMB brute force | T1110 | **PASS** (+lab controls) | SOC01 impacket ×12 → WIN01:445 | 7000006 → 100045 lvl 12 |
+| UC-12 cleartext FTP | T1040 | **PASS** | WIN01 `ftp` → SOC01:21 (`mini_ftpd.py`) | 7000007 → 100046 lvl 10 |
 
-- **Design spec:** `docs/superpowers/specs/2026-10-29-phase3-ndr-design.md` (commit `04d1c5d`, then `fce9592`)
-- **Implementation plan:** `docs/superpowers/plans/2026-10-29-phase3-ndr.md` (commit `fce9592`, 15 tasks)
-- Master architecture: `docs/superpowers/specs/2026-10-12-virtual-soc-phase-architecture-design.md` §7 + §12 G2
-
-### Phase 3 decisions locked today (do not re-litigate)
-
-| Topic | Decision |
-|---|---|
-| Scope | Full suite: exit-gate marker + 6 real detections (T1046, T1571, T1095, T1071.004, T1110, T1040) |
-| Ruleset | Custom-only + Suricata shipped default (no ET Open/Pro) |
-| Tooling | Stage nmap (Windows) + beacon.ps1 + dns-exfil.ps1 on WIN01; pyftpdlib on SOC01 (at build, NAT window) |
-| Capture | Passive promiscuous first (Approach A), G2 tcpdump gate, inline-bridge fallback (§7 of design) |
-| Power-on | **S3 only: SOC01 + WIN01 + NDR01 = 10 GB. DC01 stays OFF all phase.** |
-| SMB brute force (T1110) | Source = **SOC01 via impacket → WIN01:445** (DC01 off; no DC-targeting) |
-| Other targets | All retargeted to SOC01 `10.10.10.5` (port scan, ICMP, DNS, FTP) |
-| Mapping | Suricata sids 7000001–7000007 ↔ Wazuh rules 100040–100046 (keyed on `alert.signature_id`) |
-| NDR01 | Ubuntu 24.04, 1 vCPU / 1 GB / 15 GB, `10.10.10.40/24` on `int-corp` promiscuous allow-all, `ndradmin/ndradmin123`, Wazuh agent **003**, GRUB `clocksource=acpi_pm` |
-
-Detection suite (full details in design §4):
-- UC-06 marker: WIN01 `Invoke-WebRequest` UA `lab-ndr-test` → SOC01 (needs `python3 -m http.server 80` on SOC01)
-- UC-07 T1046: WIN01 nmap `-sS` sweep of SOC01
-- UC-08 T1571: WIN01 `beacon.ps1` → SOC01:4444 every 10s
-- UC-09 T1095: WIN01 `ping -n 3 -l 1200` SOC01
-- UC-10 T1071.004: WIN01 `dns-exfil.ps1` long-label queries → SOC01:53
-- UC-11 T1110: SOC01 impacket `smbclient.py` ×12 failed → WIN01:445
-- UC-12 T1040: WIN01 `ftp` → SOC01 `pyftpdlib` (:21)
+Task 14 close-out done: 7 case docs (`lab/cases/uc-06..12`), exercise log, lessons-learned,
+`ndr01-walkthrough.md` + `setup.md` §4, evidence `lab/evidence/phase3-alerts.json`,
+NDR01 NAT detached + RAM 1 GB + snapshot `base-phase3`.
 
 ## Current lab state
 
-- **SOC01**: RUNNING (headless). Rules 100010 + 100020 + 100029–100034 live. impacket installed (`/usr/local/lib/python3.12/dist-packages/examples/`). Clock fixed.
-- **WIN01**: RUNNING (headless), DOMAIN-JOINED. Snapshots `pre-domain-join`, `win01-joined`, `base-phase1-fixed`, **`pre-uc06`** (Phase 3 rollback point).
-- **DC01**: POWERED OFF (correct — Phase 3 needs it off).
-- **NDR01**: does not exist yet (Task 1).
-- **Repo**: all committed. HEAD = `fce9592`.
+- **SOC01**: RUNNING. Wazuh 4.14.8 healthy. Custom rules 100010+100020+100029–100034 +
+  **100040–100046** live (8467 rules total). Clock synced. `mini_ftpd.py` stopped (UC-12 done).
+  HTTP server tmux session `http` (port 80) still up.
+- **WIN01**: RUNNING. Snapshot **`pre-uc06`** (rollback point; recovered the UC-11 `labadmin`
+  lockout by restoring to it). Helpers at `C:\lab\`: `beacon.ps1`, `dns-exfil.ps1`, `port-scan.ps1`.
+  **Port 445 is OPEN** (File/Printer Sharing rule enabled) — permanent lab change for UC-11.
+- **DC01**: OFF (correct — S3).
+- **NDR01**: RUNNING (headless). Suricata 8.0.8 active (af-packet enp0s3, promisc allow-all,
+  sids 7000001–7000007). Wazuh agent **003** active. **NAT detached, RAM 1 GB, snapshot
+  `base-phase3`**. Clock synced.
+- **Repo**: uncommitted Phase 3 close-out changes (docs/cases/evidence/runbook) on top of `3ded236`.
 
 ## Next session — first steps
 
-1. Read this file, then the plan `docs/superpowers/plans/2026-10-29-phase3-ndr.md`.
-2. Pick execution approach: **subagent-driven** (recommended) or **inline** (executing-plans skill).
-3. Start **Task 0** (confirm DC01 off, SOC01/WIN01 healthy, snapshot WIN01 `pre-uc06`).
-4. Task 1 is an **interactive user step** (NDR01 Ubuntu install) — user must be present for the install.
-5. G2 capture gate (Task 4) is the go/no-go: if `tcpdump` on NDR01 doesn't see WIN01→SOC01, branch to bridge re-plumb before trusting any rule.
+1. Read this file.
+2. Commit the Phase 3 close-out (if not already committed) — `feat: Phase 3 NDR complete`.
+3. **Phase 4 SOAR** (next phase): SOAR01 n8n at 10.10.30.20:5678, per its plan/spec.
 
 ## Notes carried over
 
-- Remote control: plink from host to SOC01 (`plink -batch -hostkey SHA256:h9rirGAifvJjmZK2Ppdc177c72FOewK6EDwjKUKAyoo -pw <PW> socadmin@10.10.30.10`), <PW> from `.local-credentials.md`; sudo = `echo <PW> | sudo -S`; complex commands via base64 wrapper (`echo <b64> | base64 -d | bash`). NDR01 = hop SOC01 → `ssh ndradmin@10.10.10.40`.
-- ssh inside a piped remote script consumes stdin → ALWAYS add `< /dev/null` to ssh lines.
-- Grepping alerts.json gotcha: `sudo grep` self-matches (+1 rule 5402 per check); `id:100020` does NOT match JSON `"id":"100020"`. Grep the description phrase + filter `COMMAND`.
-- Wazuh API helper: `token=$(curl -ks -u 'wazuh:<apiPw>' -X POST https://127.0.0.1:55000/security/user/authenticate | jq -r .data.token)`. API password has a TRAILING PERIOD (in `.local-credentials.md`).
-- Custom Wazuh rules: `/var/ossec/etc/rules/local_rules.xml` on SOC01 (repo: `lab/soc01/local_rules.xml`); authored ONLY via dashboard UI by user; NO raw quotes in regex (API error 1113) — use `\x22`/`\x27`; after save, restart manager + API check (dashboard saves sometimes skip reload).
-- JSON decoder field names have NO `data.` prefix: nested keys become dotted (`Authentication.status`, `alert.signature_id`). **Phase 3 Wazuh rules key on `alert.signature_id` — verify exact name in Task 4 Step 4 before authoring Task 5.**
-- **FIM rule field is `file`, not `syscheck.path`** (wazuh#26327).
-- Windows negative-caches failed creds per server name (Phase 2). Not relevant to Phase 3 UC-11 (impacket opens fresh SMB connections each time).
-- User runs all attack simulations; assistant builds/tunes/verifies (AGENTS.md rule).
-- Clock gotcha: no NTP; savestate/resume can freeze or fast-forward a Linux VM's clock (tsc). After any resume, `date` on all VMs first. NDR01 gets `clocksource=acpi_pm` persisted.
-- Wazuh 4.14 rotates alerts/archives daily → yesterday's in rotated files, `zgrep` them.
-- Indexer queries: `curl -sku 'admin:<pw>' -H 'Content-Type: application/json' -d '{"query":...}' https://127.0.0.1:9200/wazuh-alerts-4.x-*/_search`.
+- **Remote control**: plink from host. SOC01: `plink -batch -hostkey SHA256:h9rirGAifvJjmZK2Ppdc177c72FOewK6EDwjKUKAyoo -pw <PW> socadmin@10.10.30.10` (host-only; NOT 10.10.10.5). **NDR01 has NO NAT now** — reach it ONLY via SOC01 hop: `plink ... socadmin@10.10.30.10` then `ssh ndradmin@10.10.10.40` (key auth set up). The old `-P 2223 ndradmin@127.0.0.1` is GONE (NAT detached). sudo = `echo <PW> | sudo -S`.
+- **plink quoting**: NEVER use `\"` inside a PowerShell double-quoted remote command. For anything non-trivial, write a `.sh` in `C:\Users\pedro\AppData\Local\Temp\opencode\` and run `plink ... -m <file>`.
+- **sudo grep self-match**: `sudo grep <phrase> alerts.json` adds a rule-5402 self-alert per run; filter `grep -v COMMAND`. Grep the description phrase (JSON `"id":"1000xx"` is not plain `id:1000xx`).
+- **Custom Wazuh rules** in `/var/ossec/etc/rules/local_rules.xml` (repo `lab/soc01/local_rules.xml`). Suricata-sourced rules MUST be children of built-in 86601 (`<if_sid>86601</if_sid>`), keyed on `<field name="alert.signature_id">` (dotted, NO `data.` prefix). `signature_id` is a NUMBER in eve.json, a STRING in Wazuh alerts.
+- **Test-NetConnection gotcha (UC-08)**: `Test-NetConnection -Port <closed>` retransmits SYN ~5× and trips SYN-count thresholds; use a single non-blocking `BeginConnect` for a 1-SYN benign control.
+- **Clock**: no NTP anywhere; Linux VMs STALL when the host is off/sleeping (WIN01 stays synced via Guest Additions). After ANY resume, `date` on SOC01/NDR01/DC01 first, fix with `timedatectl set-ntp off` + `set-time`, then restart Suricata (stale flow/threshold state).
+- **SMB (UC-11) gotchas**: 445 is firewalled by default on WIN01 (open via elevated `Set-NetFirewallRule -DisplayGroup "File and Printer Sharing" -Enabled True`). `smbclient.py` hangs against a filtered 445. Windows rate-limits failed SMB logons ~2s → use CONCURRENT attempts to hit the 10/30s threshold. A real brute force LOCKS the account (recover via `pre-uc06` snapshot restore).
+- **Wazuh API**: `token=$(curl -ks -u 'wazuh:<apiPw>' -X POST https://127.0.0.1:55000/security/user/authenticate | jq -r .data.token)`; api password has a TRAILING PERIOD.
+- **Indexer**: admin password is NOT `admin:admin`; filebeat auths via `/etc/filebeat/filebeat.keystore` (no `show` subcommand).
+- **alerts.json** rotates daily → older alerts in `alerts/YYYY/Mmm/` rotated files; `zgrep` them.
+- **jq gotcha**: `.rule.id` is a STRING — compare to a quoted string.
+- **User runs all attack simulations**; assistant builds/tunes/verifies. Lab is left attack-ready on purpose — do NOT run cleanup/revert without asking.
 - Secrets: `lab/runbook/.local-credentials.md` (gitignored). NDR01 `ndradmin/ndradmin123`; SOC01 `socadmin/socadmin123`; WIN01 `labadmin/labadmin123`; Wazuh API `wazuh:<apiPw>`.
-- Docs: design `docs/superpowers/specs/2026-10-29-phase3-ndr-design.md`; plan `docs/superpowers/plans/2026-10-29-phase3-ndr.md`; runbooks `lab/runbook/*.md`; cases `lab/cases/*.md`; ledger `.superpowers/sdd/progress.md`.

@@ -301,3 +301,65 @@ VBoxManage modifyvm DC01 --nic2 none        # detach NAT
 VBoxManage snapshot DC01 take base-phase2   # provisioned AD DC, isolated, pre-agent
 ```
 
+---
+
+## 4. NDR01 — Suricata network sensor (Ubuntu 24.04.5)
+
+Passive NDR sensor sniffing int-corp via VirtualBox promiscuous "allow-all" NIC. 1 vCPU /
+1 GB RAM (2 GB only during install — must drop back) / 15 GB disk. Static `10.10.10.40/24`.
+Host key `SHA256:RcRl+dhZx3qks9o3j6HxnS32ZU6QGcfWIGCI1ylXHxA`; ssh NAT port-forward `127.0.0.1:2223`.
+
+### 4.1 Create VM + disk (host)
+```powershell
+VBoxManage createvm --name NDR01 --ostype Ubuntu_64 --register
+VBoxManage modifyvm NDR01 --memory 2048 --cpus 1 --vram 16   # 2 GB for install; drop to 1024 in 4.6
+VBoxManage modifyvm NDR01 --nic1 intnet --intnet1 int-corp --nicpromisc1 allow-all \
+  --nic2 nat --natpf2 "ssh,tcp,127.0.0.1,2223,,22"
+VBoxManage createmedium disk --filename C:\lab-vms\NDR01\ndr01.vdi --size 15360
+VBoxManage storagectl NDR01 --name SATA --add sata --controller IntelAhci --bootable on
+VBoxManage storageattach NDR01 --storagectl SATA --port 0 --device 0 --type hdd --medium C:\lab-vms\NDR01\ndr01.vdi
+VBoxManage storageattach NDR01 --storagectl SATA --port 1 --device 0 --type dvddrive --medium C:\iso\ubuntu-24.04.5-live-server-amd64.iso
+VBoxManage startvm NDR01
+```
+`--nicpromisc1 allow-all` is the whole point: without it the passive sensor sees only its own traffic.
+
+### 4.2 Install Ubuntu (interactive)
+Ubuntu Server 24.04.5 minimal, user `ndradmin`, enable OpenSSH (password auth). Full disk.
+
+### 4.3 Static IP + clocksource (persist)
+```bash
+# netplan enp0s3 -> 10.10.10.40/24 on int-corp
+sudo netplan apply
+# persist a stable clocksource (tsc mis-calibrates after savestate restore):
+sudo sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/GRUB_CMDLINE_LINUX_DEFAULT="\1 clocksource=acpi_pm"/' /etc/default/grub
+sudo update-grub
+```
+
+### 4.4 Suricata 8.0.8 + config + local rules
+```bash
+sudo add-apt-repository -y ppa:oisf/suricata-stable && sudo apt update
+sudo apt install -y suricata jq
+# apply repo additions (HOME_NET, af-packet enp0s3, custom-only ruleset, eve.json types):
+#   lab/ndr01/suricata.yaml.additions.txt  ->  /etc/suricata/suricata.yaml
+#   lab/ndr01/local.rules                   ->  /etc/suricata/rules/local.rules   (sids 7000001-7000007)
+sudo suricata -T -c /etc/suricata/suricata.yaml   # config test before restart
+sudo systemctl enable --now suricata
+```
+
+### 4.5 Wazuh agent (003)
+```bash
+sudo WAZUH_MANAGER='10.10.10.5' WAZUH_AGENT_NAME='ndr01' dpkg -i ./wazuh-agent_4.14.8-1_amd64.deb
+# append before </ossec_config> in /var/ossec/etc/ossec.conf:
+#   <localfile><location>/var/log/suricata/eve.json</location><log_format>json</log_format></localfile>
+sudo systemctl restart wazuh-agent
+```
+
+### 4.6 Isolate + drop RAM + snapshot
+```powershell
+VBoxManage controlvm NDR01 acpipowerbutton
+VBoxManage modifyvm NDR01 --memory 1024        # drop the install-time 2 GB back to 1 GB
+VBoxManage modifyvm NDR01 --nic2 none          # detach NAT (removes the 2223 forward)
+VBoxManage snapshot NDR01 take base-phase3
+VBoxManage startvm NDR01 --type headless
+```
+

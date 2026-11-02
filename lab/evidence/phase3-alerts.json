@@ -1,0 +1,41 @@
+{
+  "purpose": "Phase 3 NDR verification - UC-06..UC-12 detection alerts (verified from SOC01 alerts.json / NDR01 eve.json)",
+  "verified": "2026-11-02",
+  "alerts": [
+    {
+      "uc": "UC-06", "technique": "NDR marker (exit gate)", "rule_id": "100040", "level": 8,
+      "suricata_sid": "7000001", "src": "10.10.10.20", "dst": "10.10.10.5", "proto": "TCP", "dport": "80",
+      "timestamp": "2026-10-31T02:42:28Z", "benign": "default PowerShell UA -> silent"
+    },
+    {
+      "uc": "UC-07", "technique": "T1046", "rule_id": "100041", "level": 10,
+      "suricata_sid": "7000002", "src": "10.10.10.20", "dst": "10.10.10.5", "proto": "TCP", "dport": "various",
+      "timestamp": "2026-10-31", "benign": "single SYN -> silent"
+    },
+    {
+      "uc": "UC-08", "technique": "T1571", "rule_id": "100042", "level": 12,
+      "suricata_sid": "7000003", "src": "10.10.10.20", "dst": "10.10.10.5", "proto": "TCP", "dport": "4444",
+      "timestamp": "2026-10-31", "benign": "single BeginConnect SYN -> silent"
+    },
+    {
+      "uc": "UC-09", "technique": "T1095", "rule_id": "100043", "level": 12,
+      "suricata_sid": "7000004", "src": "10.10.10.20", "dst": "10.10.10.5", "proto": "ICMP", "dport": null,
+      "timestamp": "2026-11-01T05:01:55Z", "benign": "ping -n 3 (32B) -> silent"
+    },
+    {
+      "uc": "UC-10", "technique": "T1071.004", "rule_id": "100044", "level": 12,
+      "suricata_sid": "7000005", "src": "10.10.10.20", "dst": "10.10.10.5", "proto": "UDP", "dport": "53",
+      "timestamp": "2026-11-01T05:09:59Z", "benign": "nslookup corp.lab -> silent"
+    },
+    {
+      "uc": "UC-11", "technique": "T1110", "rule_id": "100045", "level": 12,
+      "suricata_sid": "7000006", "src": "10.10.10.5", "dst": "10.10.10.20", "proto": "TCP", "dport": "445",
+      "timestamp": "2026-11-02T01:42:38Z", "benign": "single successful logon -> silent"
+    },
+    {
+      "uc": "UC-12", "technique": "T1040", "rule_id": "100046", "level": 10,
+      "suricata_sid": "7000007", "src": "10.10.10.20", "dst": "10.10.10.5", "proto": "TCP", "dport": "21",
+      "timestamp": "2026-11-02T01:54:03Z", "benign": "no FTP session -> silent"
+    }
+  ]
+}

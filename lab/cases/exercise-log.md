@@ -22,3 +22,10 @@
 | 2026-10-24 | UC-03b benign (read-only samba-tool) | no 100032 | no 100032 | n/a |
 | 2026-10-24 | UC-04 Kerberoasting | rule 100033 | 100033 lvl 12 "TGS-REQ for MSSQLSvc/... by attacker" 04:01:52Z | n/a (kept for study) |
 | 2026-10-24 | UC-05 AS-REP roasting | rule 100034 | 100034 lvl 12 (multiple; duplicate + normal-Kerberos FP noted) | n/a (kept for study) |
+| 2026-10-31 | UC-06 NDR marker | rule 100040 | 100040 lvl 8 (lab-ndr-test UA, agent 003); benign default UA silent | n/a |
+| 2026-10-31 | UC-07 port scan | rule 100041 | 100041 lvl 10 T1046 (port-scan.ps1, agent 003); benign single SYN silent | n/a |
+| 2026-10-31 | UC-08 beaconing | rule 100042 | 100042 lvl 12 T1571 (beacon.ps1, agent 003); benign BeginConnect silent | n/a |
+| 2026-11-01 | UC-09 ICMP tunnel | rule 100043 | 100043 lvl 12 T1095 05:01:55Z (src 10.10.10.20→10.10.10.5, ICMP); benign ping silent | n/a |
+| 2026-11-01 | UC-10 DNS anomaly | rule 100044 | 100044 lvl 12 T1071.004 05:09:59Z (UDP, 10.10.10.20→10.10.10.5); benign nslookup silent | n/a |
+| 2026-11-02 | UC-11 SMB brute force | rule 100045 | 100045 lvl 12 T1110 01:42:38Z (10.10.10.5→10.10.10.20:445); benign single logon silent | n/a (445 left open) |
+| 2026-11-02 | UC-12 cleartext FTP | rule 100046 | 100046 lvl 10 T1040 01:54:03Z (10.10.10.20→10.10.10.5:21); benign silent | n/a |
