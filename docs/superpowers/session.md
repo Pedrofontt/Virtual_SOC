@@ -1,6 +1,6 @@
 # Session state — resume here
 
-Last updated: 2026-11-02 (Phase 3 NDR **COMPLETE** — all 7 detections verified PASS, close-out done). Resume by reading this file; next is Phase 4 SOAR.
+Last updated: 2026-11-02 (Phase 3 NDR **COMPLETE + committed**; Phase 4 SOAR brainstorming started, trigger question pending). Resume by reading this file; next is Phase 4 SOAR.
 
 ## Where we are — PHASE 3 NDR: COMPLETE
 
@@ -32,13 +32,22 @@ NDR01 NAT detached + RAM 1 GB + snapshot `base-phase3`.
 - **NDR01**: RUNNING (headless). Suricata 8.0.8 active (af-packet enp0s3, promisc allow-all,
   sids 7000001–7000007). Wazuh agent **003** active. **NAT detached, RAM 1 GB, snapshot
   `base-phase3`**. Clock synced.
-- **Repo**: uncommitted Phase 3 close-out changes (docs/cases/evidence/runbook) on top of `3ded236`.
+- **Repo**: clean. Phase 3 fully committed: `b713802` (Phase 3 complete), `edc775c` (UC-06..12 screenshots), `8ebe2ea` (NDR01 runbook + walkthrough).
 
 ## Next session — first steps
 
 1. Read this file.
-2. Commit the Phase 3 close-out (if not already committed) — `feat: Phase 3 NDR complete`.
-3. **Phase 4 SOAR** (next phase): SOAR01 n8n at 10.10.30.20:5678, per its plan/spec.
+2. **Phase 4 SOAR** (brainstorming in progress): agree on the trigger use case (UC-01 T1003.001 vs NDR vs both), then finish design → write spec → plan. See "Phase 4 SOAR context" below.
+
+## Phase 4 SOAR — brainstorming context (carry over)
+
+- **Purpose (agreed)**: complete the pipeline (alert → enrich → incident → safe action → audit), automate the analyst loop, demonstrate SIEM→SOAR orchestration, safe + accountable (non-destructive; human approval for anything that changes the endpoint). This is Nivel 3 in `initial_info.md`.
+- **Tool (locked in architecture)**: n8n on SOAR01 — Docker Engine (not Docker Desktop), single container, SQLite backend, queue mode off. 1 vCPU / 2 GB / 20 GB. host-only `10.10.30.20` (n8n `:5678`) + temporary NAT.
+- **n8n container settings**: `EXECUTIONS_DATA_PRUNE=true`, `EXECUTIONS_DATA_MAX_AGE=168`, metrics off, no extra workers.
+- **Playbook must**: record alert id / rule id / agent name / timestamp; enrich locally (no mandatory internet); write an incident record (local file or n8n data store); take one safe action (tag the alert or send a local notification); append an audit line with action + result.
+- **Out of scope**: destructive active response (disable account, isolate host, delete files); VirusTotal unless a documented exception (local enrichment preferred to preserve isolation).
+- **Power-on set S4**: SOC01 + WIN01 + SOAR01 (11 GB; DC01 + NDR01 off).
+- **OPEN — trigger question** (not yet answered): UC-01 T1003.001 (requires WIN01 lab-control rework) vs an NDR detection (fresh/easy) vs both staged. Architecture doc assumes UC-01.
 
 ## Notes carried over
 
