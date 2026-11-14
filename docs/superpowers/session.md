@@ -1,53 +1,38 @@
 # Session state — resume here
 
-Last updated: 2026-11-02 (Phase 3 NDR **COMPLETE + committed**; Phase 4 SOAR brainstorming started, trigger question pending). Resume by reading this file; next is Phase 4 SOAR.
+Last updated: 2026-11-14 (Phase 4 SOAR **execution started** — Task 0 done). Resume by reading this file; next is Phase 4 SOAR Task 1 (SOAR01 VM build, interactive).
 
-## Where we are — PHASE 3 NDR: COMPLETE
+## Where we are — PHASE 3 NDR: COMPLETE; PHASE 4 SOAR: IN PROGRESS
 
-All 7 detections verified end-to-end (Suricata eve.json → agent 003 → SOC01 manager → custom rule):
+Phase 3 NDR (UC-06..12, 7 detections) verified end-to-end and committed (`b713802`/`edc775c`/`8ebe2ea`).
 
-| UC | MITRE | Status | Trigger | sid → rule |
-|---|---|---|---|---|
-| UC-06 marker | — | **PASS** | `Invoke-WebRequest` UA `lab-ndr-test` → SOC01 | 7000001 → 100040 lvl 8 |
-| UC-07 port scan | T1046 | **PASS** | `C:\lab\port-scan.ps1` (60 SYNs) | 7000002 → 100041 lvl 10 |
-| UC-08 beaconing | T1571 | **PASS** | `C:\lab\beacon.ps1` (SYNs to :4444) | 7000003 → 100042 lvl 12 |
-| UC-09 ICMP tunnel | T1095 | **PASS** | `ping -n 3 -l 1200 10.10.10.5` | 7000004 → 100043 lvl 12 |
-| UC-10 DNS anomaly | T1071.004 | **PASS** | `C:\lab\dns-exfil.ps1` → SOC01:53 | 7000005 → 100044 lvl 12 |
-| UC-11 SMB brute force | T1110 | **PASS** (+lab controls) | SOC01 impacket ×12 → WIN01:445 | 7000006 → 100045 lvl 12 |
-| UC-12 cleartext FTP | T1040 | **PASS** | WIN01 `ftp` → SOC01:21 (`mini_ftpd.py`) | 7000007 → 100046 lvl 10 |
-
-Task 14 close-out done: 7 case docs (`lab/cases/uc-06..12`), exercise log, lessons-learned,
-`ndr01-walkthrough.md` + `setup.md` §4, evidence `lab/evidence/phase3-alerts.json`,
-NDR01 NAT detached + RAM 1 GB + snapshot `base-phase3`.
+Phase 4 SOAR (UC-13): design spec + implementation plan committed (`7b220e8` + `e2b33bd`), execution started. Task 0 pre-flight done; next is Task 1 (build SOAR01 VM — interactive user install).
 
 ## Current lab state
 
-- **SOC01**: RUNNING. Wazuh 4.14.8 healthy. Custom rules 100010+100020+100029–100034 +
-  **100040–100046** live (8467 rules total). Clock synced. `mini_ftpd.py` stopped (UC-12 done).
-  HTTP server tmux session `http` (port 80) still up.
-- **WIN01**: RUNNING. Snapshot **`pre-uc06`** (rollback point; recovered the UC-11 `labadmin`
-  lockout by restoring to it). Helpers at `C:\lab\`: `beacon.ps1`, `dns-exfil.ps1`, `port-scan.ps1`.
-  **Port 445 is OPEN** (File/Printer Sharing rule enabled) — permanent lab change for UC-11.
-- **DC01**: OFF (correct — S3).
-- **NDR01**: RUNNING (headless). Suricata 8.0.8 active (af-packet enp0s3, promisc allow-all,
-  sids 7000001–7000007). Wazuh agent **003** active. **NAT detached, RAM 1 GB, snapshot
-  `base-phase3`**. Clock synced.
-- **Repo**: clean. Phase 3 fully committed: `b713802` (Phase 3 complete), `edc775c` (UC-06..12 screenshots), `8ebe2ea` (NDR01 runbook + walkthrough).
+- **SOC01**: RUNNING. Wazuh 4.14.8 healthy (indexer+manager+dashboard active, cluster yellow = normal single-node). Custom rules 100010+100020+100029–100034 + 100040–100046 live. Clock fixed (was ~12 d behind after host downtime; reset to real UTC, `timedatectl set-ntp off`).
+- **WIN01**: RUNNING. Snapshot **`pre-soar`** taken (new Phase 4 rollback point, child of `pre-uc06`). Helpers at `C:\lab\`. Port 445 OPEN.
+- **DC01**: OFF (poweroff — correct for S4).
+- **NDR01**: OFF (saved-state — correct for S4).
+- **SOAR01**: not yet created (Task 1).
+- **Repo**: clean at `e2b33bd` (Phase 4 plan).
 
 ## Next session — first steps
 
 1. Read this file.
-2. **Phase 4 SOAR** (brainstorming in progress): agree on the trigger use case (UC-01 T1003.001 vs NDR vs both), then finish design → write spec → plan. See "Phase 4 SOAR context" below.
+2. **Phase 4 SOAR Task 1**: create SOAR01 VM + Ubuntu install (interactive user step). Plan: `docs/superpowers/plans/2026-11-14-phase4-soar.md`.
 
-## Phase 4 SOAR — brainstorming context (carry over)
+## Phase 4 SOAR — locked decisions (from design spec)
 
-- **Purpose (agreed)**: complete the pipeline (alert → enrich → incident → safe action → audit), automate the analyst loop, demonstrate SIEM→SOAR orchestration, safe + accountable (non-destructive; human approval for anything that changes the endpoint). This is Nivel 3 in `initial_info.md`.
-- **Tool (locked in architecture)**: n8n on SOAR01 — Docker Engine (not Docker Desktop), single container, SQLite backend, queue mode off. 1 vCPU / 2 GB / 20 GB. host-only `10.10.30.20` (n8n `:5678`) + temporary NAT.
-- **n8n container settings**: `EXECUTIONS_DATA_PRUNE=true`, `EXECUTIONS_DATA_MAX_AGE=168`, metrics off, no extra workers.
-- **Playbook must**: record alert id / rule id / agent name / timestamp; enrich locally (no mandatory internet); write an incident record (local file or n8n data store); take one safe action (tag the alert or send a local notification); append an audit line with action + result.
-- **Out of scope**: destructive active response (disable account, isolate host, delete files); VirusTotal unless a documented exception (local enrichment preferred to preserve isolation).
-- **Power-on set S4**: SOC01 + WIN01 + SOAR01 (11 GB; DC01 + NDR01 off).
-- **OPEN — trigger question** (not yet answered): UC-01 T1003.001 (requires WIN01 lab-control rework) vs an NDR detection (fresh/easy) vs both staged. Architecture doc assumes UC-01.
+- **Tool**: n8n on SOAR01 — Docker Engine (not Desktop), single container, SQLite, queue off. 1 vCPU / 2 GB / 20 GB. host-only `10.10.30.20` (n8n `:5678`) + temporary NAT (attach only during VT demo).
+- **n8n env**: `EXECUTIONS_DATA_PRUNE=true`, `EXECUTIONS_DATA_MAX_AGE=168`, `N8N_METRICS=false`, no workers.
+- **Trigger**: Sysmon **EID 22** (DNS query) on WIN01 → Wazuh rule **100047** (level 12, MITRE T1071.004, group `dns,lab,soar,`) matching `win.eventdata.queryName` = `<MALICIOUS_DOMAIN>` (VT-verified at demo time).
+- **Bridge**: Wazuh integration `forward-to-n8n` → POST rule-100047 alert JSON to n8n webhook `/webhook/soar`.
+- **Workflow (7 nodes)**: Webhook → extract (Code) → VT domain lookup (HTTP) → build-incident (Code) → write incident/notification/audit under bind-mounted `/srv/soar`.
+- **Safe action**: local analyst notification (`/srv/soar/notifications/latest.json`) + incident record + audit line. No destructive active response.
+- **Power-on set S4**: SOC01 + WIN01 + SOAR01 (11 GB; DC01 + NDR01 OFF).
+- **Secrets**: VT key in `lab/runbook/.local-credentials.md` (gitignored) + n8n credential only; never committed/exported.
+- **UC-13** exit gate; MITRE T1071.004; `<MALICIOUS_DOMAIN>` chosen + VT-verified immediately before demo (`malicious > 0`).
 
 ## Notes carried over
 
