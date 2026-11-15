@@ -8,7 +8,7 @@ Two VirtualBox networks. No bridged adapters. No DHCP on lab networks. All IPs s
 |---|---|---|
 | Host (Windows) | 10.10.30.1 | Analyst browser |
 | SOC01 nic0 | 10.10.30.10 | Wazuh dashboard :443, API :55000 |
-| SOAR01 nic0 (phase 4) | 10.10.30.20 | n8n :5678 |
+| SOAR01 nic0 (built, phase 4) | 10.10.30.20 | n8n :5678 |
 
 ## int-corp — internal, LAB-CORP, 10.10.10.0/24
 
@@ -25,4 +25,5 @@ Two VirtualBox networks. No bridged adapters. No DHCP on lab networks. All IPs s
 - SOC01: host-only + int-corp + NAT (NAT detached after Task 3 checklist)
 - WIN01: int-corp + NAT (NAT detached after Task 5 checklist)
 - NDR01: int-corp (NIC1, promisc allow-all) + NAT (NIC2, detached after build)
+- SOAR01: host-only (NIC1) + NAT (NIC2, temporary — detach in Task 8)
 - NAT adapters are for package installs only. When detached, the lab has no Internet path.
