@@ -220,7 +220,7 @@ Host key `SHA256:bt437mjTsTehLfEyzu+dinU7WnM4KDq1bhfeY6kxfK4`; ssh NAT port-forw
 ### 3.1 Create VM + disk (host)
 ```powershell
 VBoxManage createvm --name DC01 --ostype Ubuntu_64 --register
-VBoxManage modifyvm DC01 --memory 4096 --cpus 2 --vram 16
+VBoxManage modifyvm DC01 --memory 4096 --cpus 2 --vram 16   # 4 GB for install; drop to 2048 in 3.9
 VBoxManage modifyvm DC01 --nic1 intnet --intnet1 int-corp --nic2 nat
 VBoxManage createmedium disk --filename C:\lab-vms\DC01\dc01.vdi --size 40960
 VBoxManage storagectl DC01 --name SATA --add sata --controller IntelAhci --bootable on
@@ -298,7 +298,8 @@ sudo systemctl restart wazuh-agent
 ```powershell
 VBoxManage controlvm DC01 acpipowerbutton   # graceful shutdown
 VBoxManage modifyvm DC01 --nic2 none        # detach NAT
-VBoxManage snapshot DC01 take base-phase2   # provisioned AD DC, isolated, pre-agent
+VBoxManage modifyvm DC01 --memory 2048      # drop the install-time 4 GB back to 2 GB (S2 = 11 GB)
+VBoxManage snapshot DC01 take base-phase2   # provisioned AD DC, isolated, agent enrolled
 ```
 
 ---
