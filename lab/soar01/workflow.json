@@ -1,0 +1,234 @@
+﻿{
+    "name":  "SOAR01 VirusTotal enrichment",
+    "description":  null,
+    "active":  false,
+    "nodes":  [
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const prev = $(\u0027extract\u0027).first().json;\nconst vt = $(\u0027vt-lookup\u0027).first().json;\nconst s = vt.data?.attributes?.last_analysis_stats || {};\nconst verdict = { malicious: s.malicious ?? 0, suspicious: s.suspicious ?? 0, harmless: s.harmless ?? 0, undetected: s.undetected ?? 0 };\nconst reputation = vt.data?.attributes?.reputation ?? 0;\nconst domain = vt.data?.id ?? prev.domain;\nconst incident = {\n  incident_id: prev.alert_id,\n  created_at: new Date().toISOString(),\n  alert: prev.raw,\n  enrichment: { source: \u0027virustotal\u0027, domain, verdict, reputation, permalink: `https://www.virustotal.com/gui/domain/${domain}` }\n};\nreturn {\n  alert_id: prev.alert_id,\n  domain,\n  incident,\n  notification: {\n    severity: \u0027high\u0027,\n    message: `Analyst paged: DNS query to known-malicious domain ${domain} (rule ${prev.rule_id}) on ${prev.agent}. VT: ${verdict.malicious} vendors malicious.`,\n    alert_id: prev.alert_id,\n    timestamp: incident.created_at\n  },\n  audit: { timestamp: incident.created_at, alert_id: prev.alert_id, domain, action: \u0027notify_analyst\u0027, result: \u0027success\u0027 }\n}"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       368,
+                                       -128
+                                   ],
+                      "id":  "cf4731a2-91f3-4d6a-a99c-faa3877e6bda",
+                      "name":  "build-incident"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const { writeFileSync } = require(\u0027fs\u0027);\nconst d = $input.first().json;\nwriteFileSync(`/srv/soar/incidents/${d.alert_id}.json`, JSON.stringify(d.incident, null, 2));\nreturn d;"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       592,
+                                       -128
+                                   ],
+                      "id":  "d349ae23-9b7c-42c5-830e-771ee368d4db",
+                      "name":  "write-incident"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const { writeFileSync } = require(\u0027fs\u0027);\nconst d = $input.first().json;\nwriteFileSync(\u0027/srv/soar/notifications/latest.json\u0027, JSON.stringify(d.notification, null, 2));\nreturn d;"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       816,
+                                       -128
+                                   ],
+                      "id":  "c7b99c11-db1b-4632-b118-61cc0a14d635",
+                      "name":  "write-notification"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const a = $input.first().json;\nconst body = a.body ?? a;\nreturn {\n  alert_id: body.id,\n  rule_id: body.rule?.id,\n  agent: body.agent?.name,\n  timestamp: body.timestamp,\n  domain: body.data?.win?.eventdata?.queryName || null,\n  raw: body\n};"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -80,
+                                       -128
+                                   ],
+                      "id":  "f9666d15-0ac7-467a-8697-b4704aed202e",
+                      "name":  "extract"
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "=https://www.virustotal.com/api/v3/domains/{{ $json.domain }}",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "httpHeaderAuth",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.5,
+                      "position":  [
+                                       144,
+                                       -128
+                                   ],
+                      "id":  "e424f98d-e3ee-4e92-9c14-e1ab4326deee",
+                      "name":  "vt-lookup",
+                      "credentials":  {
+                                          "httpHeaderAuth":  {
+                                                                 "id":  "GoRRmQCCX6TxwaP7",
+                                                                 "name":  "x-apikey"
+                                                             }
+                                      }
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const { appendFileSync } = require(\u0027fs\u0027);\nconst d = $input.first().json;\nappendFileSync(\u0027/srv/soar/audit.log\u0027, JSON.stringify(d.audit) + \u0027\\n\u0027);\nreturn d;"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       976,
+                                       -112
+                                   ],
+                      "id":  "9d57f4d4-d666-4760-861a-30e4f9a2bed6",
+                      "name":  "write-audit"
+                  },
+                  {
+                      "parameters":  {
+                                         "httpMethod":  "POST",
+                                         "path":  "soar",
+                                         "authentication":  "none",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.webhook",
+                      "typeVersion":  2.2,
+                      "position":  [
+                                       -304,
+                                       -128
+                                   ],
+                      "id":  "3ba83f34-c7d3-4cfe-a342-3ca3f2aa518d",
+                      "name":  "Webhook",
+                      "webhookId":  "df4927e2-a3ad-4bfe-8201-0692ce96bf10"
+                  }
+              ],
+    "connections":  {
+                        "build-incident":  {
+                                               "main":  [
+                                                            [
+                                                                {
+                                                                    "node":  "write-incident",
+                                                                    "type":  "main",
+                                                                    "index":  0
+                                                                }
+                                                            ]
+                                                        ]
+                                           },
+                        "write-incident":  {
+                                               "main":  [
+                                                            [
+                                                                {
+                                                                    "node":  "write-notification",
+                                                                    "type":  "main",
+                                                                    "index":  0
+                                                                }
+                                                            ]
+                                                        ]
+                                           },
+                        "extract":  {
+                                        "main":  [
+                                                     [
+                                                         {
+                                                             "node":  "vt-lookup",
+                                                             "type":  "main",
+                                                             "index":  0
+                                                         }
+                                                     ]
+                                                 ]
+                                    },
+                        "vt-lookup":  {
+                                          "main":  [
+                                                       [
+                                                           {
+                                                               "node":  "build-incident",
+                                                               "type":  "main",
+                                                               "index":  0
+                                                           }
+                                                       ]
+                                                   ]
+                                      },
+                        "write-notification":  {
+                                                   "main":  [
+                                                                [
+                                                                    {
+                                                                        "node":  "write-audit",
+                                                                        "type":  "main",
+                                                                        "index":  0
+                                                                    }
+                                                                ]
+                                                            ]
+                                               },
+                        "Webhook":  {
+                                        "main":  [
+                                                     [
+                                                         {
+                                                             "node":  "extract",
+                                                             "type":  "main",
+                                                             "index":  0
+                                                         }
+                                                     ]
+                                                 ]
+                                    }
+                    },
+    "settings":  {
+                     "executionOrder":  "v1",
+                     "binaryMode":  "separate",
+                     "timeSavedMode":  "fixed",
+                     "callerPolicy":  "workflowsFromSameOwner",
+                     "availableInMCP":  false
+                 },
+    "staticData":  null,
+    "meta":  {
+                 "templateCredsSetupCompleted":  true
+             },
+    "nodeGroups":  [
+
+                   ],
+    "pinData":  {
+
+                },
+    "versionId":  "52b84077-d54d-4dc2-be4f-3c94416099ae",
+    "activeVersionId":  "52b84077-d54d-4dc2-be4f-3c94416099ae",
+    "versionCounter":  49,
+    "triggerCount":  1,
+    "sourceWorkflowId":  null,
+    "tags":  [
+
+             ],
+    "shared":  [
+                   {
+                       "updatedAt":  "2026-11-15T02:14:23.625Z",
+                       "createdAt":  "2026-11-15T02:14:23.625Z",
+                       "role":  "workflow:owner",
+                       "workflowId":  "uw47iA9RnDEEyCrS",
+                       "projectId":  "nNk3jy3TpMqilXB1",
+                       "project":  {
+                                       "updatedAt":  "2026-11-15T00:46:18.365Z",
+                                       "createdAt":  "2026-11-15T00:42:46.594Z",
+                                       "id":  "nNk3jy3TpMqilXB1",
+                                       "name":  "SOAR Admin \u003csoaradmin@corp.lab\u003e",
+                                       "type":  "personal",
+                                       "icon":  null,
+                                       "description":  null,
+                                       "customTelemetryTags":  [
+
+                                                               ],
+                                       "creatorId":  "ea2255e8-2744-4968-9302-b4d9fee93e37"
+                                   }
+                   }
+               ],
+    "versionMetadata":  {
+                            "name":  "Version 778",
+                            "description":  ""
+                        }
+}
