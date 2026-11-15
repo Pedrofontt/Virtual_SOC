@@ -4,5 +4,6 @@
     <ProcessAccess onmatch="include">
       <TargetImage condition="is">C:\Windows\System32\lsass.exe</TargetImage>
     </ProcessAccess>
+    <DnsQuery onmatch="exclude"/>
   </EventFiltering>
 </Sysmon>
