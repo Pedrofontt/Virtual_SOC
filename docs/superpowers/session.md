@@ -1,8 +1,8 @@
 # Session state — resume here
 
-Last updated: 2026-11-15 (Phase 4 SOAR **Tasks 0–6 complete; Task 7 in progress** — UC-13 demo; VMs powered off for host sleep). Resume by reading this file; next is **Task 7 Step 3: get a fresh DNS query event for `malware.wicar.org` on WIN01**.
+Last updated: 2026-11-15 (Phase 4 SOAR **Tasks 0–7 complete** — UC-13 demo reproduced end-to-end; evidence exported). Resume by reading this file; next is **Task 8 close-out**.
 
-## Where we are — PHASE 3 NDR: COMPLETE; PHASE 4 SOAR: TASK 7/9
+## Where we are — PHASE 3 NDR: COMPLETE; PHASE 4 SOAR: TASK 8/9
 
 Phase 3 NDR (UC-06..12) done + committed. Phase 4 SOAR (UC-13) execution in progress:
 
@@ -13,28 +13,34 @@ Phase 3 NDR (UC-06..12) done + committed. Phase 4 SOAR (UC-13) execution in prog
 - **Task 4** rule 100047: DONE + **smoke-test PASSED** (fires on `malware.wicar.org`).
 - **Task 5** Wazuh→n8n integration: DONE (`custom-forward-to-n8n`).
 - **Task 6** n8n workflow: DONE + **smoke-test PASSED** (manual POST `google.com` → VT verdict + files written). Committed `3bb61eb`.
-- **Task 7** UC-13 demo: **IN PROGRESS** — rule/alert path works for background traffic, but user's manual `Resolve-DnsName malware.wicar.org` is being served from DNS cache (no EID 22 event). Awaiting fresh unique-subdomain query (see Next).
+- **Task 7** UC-13 demo: DONE — rule 100047 → integration → n8n verified end-to-end **twice** (18:55 and 20:12 alerts; incidents, notification, audit written). Evidence exported to `lab/evidence/`.
 - **Task 8** close-out: not started.
 
-## Current lab state (all VMs DOWN for host sleep — 2026-11-15)
+## Current lab state (SOC01/WIN01/SOAR01 RUNNING — ready for next demo, 2026-11-15)
 
-- **SOC01**: poweroff. Wazuh 4.14.8 healthy when running (cluster `yellow` = normal single-node). Custom rules through **100047** live. Integration `custom-forward-to-n8n` wired (rule 100047 → `http://10.10.30.20:5678/webhook/soar`). Clock ~synced (re-check `date` after any host sleep).
-- **WIN01**: poweroff. Sysmon EID 22 (DNS) enabled. Snapshot **`pre-soar`** (rollback point). Sysmon64.exe at `C:\lab\tools\Sysmon64.exe`, config `C:\lab\sysmon-config.xml`. **guestcontrol runs NON-elevated** → elevated WIN01 ops require the USER.
-- **SOAR01**: poweroff. When running: n8n `:5678` up (container `n8n`), workflow id `uw47iA9RnDEEyCrS` published (7 nodes). NAT still attached (detach in Task 8). `/srv/soar` world-writable; `/srv/n8n` bind-mounted for n8n data.
+- **SOC01**: running. Wazuh 4.14.8 healthy (cluster `yellow` = normal single-node). Rule **100047** live. Integration `custom-forward-to-n8n` wired (rule 100047 → `http://10.10.30.20:5678/webhook/soar`). Clock synced.
+- **WIN01**: running. Sysmon EID 22 (DNS) enabled. **Defender real-time OFF + tamper OFF** (for demos; re-enable after). Snapshot **`pre-soar`**. Sysmon64.exe `C:\lab\tools\Sysmon64.exe`, config `C:\lab\sysmon-config.xml`. **guestcontrol NON-elevated** → elevated WIN01 ops require the USER.
+- **SOAR01**: running. n8n `:5678` up (container `n8n`), workflow id `uw47iA9RnDEEyCrS` published (7 nodes). NAT still attached (detach in Task 8). `/srv/soar` holds 2 demo incidents + notification + audit.
 - **DC01**: poweroff. **NDR01**: saved-state. Correct for S4.
-- **Repo**: see `git log`; Phase 4 commits include `844ae2e`…`514dd4c`, plus workflow `3bb61eb`, ledger `0f536cf`.
+- **Repo**: see `git log`; Phase 4 commits include `844ae2e`…`514dd4c`, workflow `3bb61eb`, ledger `0f536cf`, Task 7 evidence.
 
-## Next — resume Task 7 (UC-13 demo)
+## Next — Task 8 close-out (after any live demos)
 
-Resume sequence:
-1. Power on **SOC01, WIN01, SOAR01** (S4). Re-check clocks (`date` on SOC01/SOAR01; WIN01 via Guest Additions). If SOC01 clock drifted: `timedatectl set-ntp off` + `sudo date -s ...` + `sudo systemctl restart wazuh-manager`.
-2. **Force a fresh DNS query on WIN01** (inside the VM, elevated PowerShell). `Resolve-DnsName malware.wicar.org` is being answered from the DNS cache (no wire query → no Sysmon EID 22 event). Use a never-queried name (still matches rule 100047's substring regex):
-   `Resolve-DnsName zzq7x1.malware.wicar.org`
-   Timeout is expected/fine. This must produce `queryName` in `/var/ossec/logs/archives/archives.json` (status 1460).
-3. Verify rule 100047 alert in `/var/ossec/logs/alerts/alerts.json` (filter `grep -v COMMAND`), then verify n8n auto-wrote `/srv/soar/incidents/<alert-id>.json`, `/srv/soar/notifications/latest.json`, `/srv/soar/audit.log`.
-4. Benign control (query a benign domain) → confirm no rule-100047 alert.
-5. Export evidence to `lab/evidence/phase4-alerts.json`, `lab/evidence/phase4-incident.json`, `lab/evidence/uc-13-alert.png`; commit.
-6. **Task 8** close-out (detach SOAR01 NAT, refresh this file/runbook/ledger, acceptance).
+### Reproducing the UC-13 demo (every live run)
+IMPORTANT: exact `malware.wicar.org` sticks in WIN01's DNS **negative cache**; `ipconfig /flushdns` does NOT clear it and `dnscache` is a protected service. A WIN01 **reboot** clears it (power-cycling the VM does too). Defender real-time also blocks the exact domain (tamper is OFF in the lab).
+
+1. Power on **SOC01, WIN01, SOAR01** (S4). Re-check clocks.
+2. On WIN01 (elevated PowerShell):
+   `Set-MpPreference -DisableRealtimeMonitoring $true`
+   `ipconfig /flushdns`
+   `Resolve-DnsName -Type A malware.wicar.org`   # timeout expected; must log Sysmon EID 22
+3. Verify SOC01 rule 100047 alert, and SOAR01 `/srv/soar/incidents/<id>.json` + `notifications/latest.json` + `audit.log`.
+4. Benign control: `Resolve-DnsName -Type TXT example.com` → event but **no** 100047 alert.
+
+Gotchas: unique subdomains are cache-proof but VT returns 404 (workflow stops). Typos (`==`, `.com`) either 404 or don't match the rule. After demos, re-enable Defender: `Set-MpPreference -DisableRealtimeMonitoring $false`.
+
+### Task 8 close-out
+1. Detach SOAR01 NAT (keep host-only). 2. Refresh this file / runbook / ledger. 3. Acceptance.
 
 ### Task 6 workflow (7 nodes) — actual built names
 1. **Webhook** (trigger): Method `POST`, Path `soar`, Respond `Immediately`; `webhookId` `df4927e2-a3ad-4bfe-8201-0692ce96bf10`. URL `http://10.10.30.20:5678/webhook/soar`.
