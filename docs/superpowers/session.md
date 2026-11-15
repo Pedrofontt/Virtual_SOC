@@ -1,51 +1,70 @@
 # Session state — resume here
 
-Last updated: 2026-11-14 (Phase 4 SOAR **execution started** — Task 0 done). Resume by reading this file; next is Phase 4 SOAR Task 1 (SOAR01 VM build, interactive).
+Last updated: 2026-11-15 (Phase 4 SOAR **Tasks 0–5 complete; Task 6 in progress** — n8n workflow build, waiting on user VT credential). Resume by reading this file; next is **Task 6 workflow build**.
 
-## Where we are — PHASE 3 NDR: COMPLETE; PHASE 4 SOAR: IN PROGRESS
+## Where we are — PHASE 3 NDR: COMPLETE; PHASE 4 SOAR: TASK 6/9
 
-Phase 3 NDR (UC-06..12, 7 detections) verified end-to-end and committed (`b713802`/`edc775c`/`8ebe2ea`).
+Phase 3 NDR (UC-06..12) done + committed. Phase 4 SOAR (UC-13) execution in progress:
 
-Phase 4 SOAR (UC-13): design spec + implementation plan committed (`7b220e8` + `e2b33bd`), execution started. Task 0 pre-flight done; next is Task 1 (build SOAR01 VM — interactive user install).
+- **Task 0** pre-flight: DONE (S4 power-on, WIN01 snapshot `pre-soar`, SOC01 clock fixed).
+- **Task 1** SOAR01 VM: DONE (Ubuntu 24.04, `soaradmin`, static `10.10.30.20/24`, NAT `10.0.3.0/24`).
+- **Task 2** Docker + n8n: DONE (Docker 29.1.3, n8n **v2.47.7**, owner `soaradmin@corp.lab`).
+- **Task 3** Sysmon EID 22: DONE (field **`win.eventdata.queryName`**, group **`sysmon_event_22`** confirmed).
+- **Task 4** rule 100047: DONE + **smoke-test PASSED** (fires on `malware.wicar.org`).
+- **Task 5** Wazuh→n8n integration: DONE (`custom-forward-to-n8n`).
+- **Task 6** n8n workflow: **IN PROGRESS** — VT credential + 7-node workflow build (user action).
+- **Task 7** UC-13 demo, **Task 8** close-out: not started.
 
 ## Current lab state
 
-- **SOC01**: RUNNING. Wazuh 4.14.8 healthy (indexer+manager+dashboard active, cluster yellow = normal single-node). Custom rules 100010+100020+100029–100034 + 100040–100046 live. Clock fixed (was ~12 d behind after host downtime; reset to real UTC, `timedatectl set-ntp off`).
-- **WIN01**: RUNNING. Snapshot **`pre-soar`** taken (new Phase 4 rollback point, child of `pre-uc06`). Helpers at `C:\lab\`. Port 445 OPEN.
-- **DC01**: OFF (poweroff — correct for S4).
-- **NDR01**: OFF (saved-state — correct for S4).
-- **SOAR01**: not yet created (Task 1).
-- **Repo**: clean at `e2b33bd` (Phase 4 plan).
+- **SOC01**: RUNNING, Wazuh 4.14.8 healthy (cluster `yellow` = normal single-node). Custom rules through **100047** live. Integration `custom-forward-to-n8n` wired (rule 100047 → `http://10.10.30.20:5678/webhook/soar`). Clock ~synced (re-check `date` after any host sleep). `content-updater`/`vulnerability_feed_manager` errors are BENIGN (SOC01 offline, no internet — stale CVE feed only).
+- **WIN01**: RUNNING. Sysmon EID 22 (DNS) enabled. Snapshot **`pre-soar`** (rollback point). Sysmon64.exe at `C:\lab\tools\Sysmon64.exe`, config `C:\lab\sysmon-config.xml`. **guestcontrol runs NON-elevated** → elevated WIN01 ops (e.g. Sysmon reload) require the USER.
+- **SOAR01**: RUNNING. n8n `:5678` up (container `n8n`), owner `soaradmin@corp.lab` / `soaradmin123`. NAT still attached (detach in Task 8). `/srv/soar` (incidents/, notifications/, audit.log) world-writable; `/srv/n8n` bind-mounted for n8n data persistence.
+- **DC01**: OFF (poweroff). **NDR01**: OFF (saved-state). Correct for S4.
+- **Repo**: clean at `514dd4c` (Phase 4 commits `844ae2e`…`514dd4c`).
 
-## Next session — first steps
+## Next — Task 6 (n8n workflow) first steps
 
-1. Read this file.
-2. **Phase 4 SOAR Task 1**: create SOAR01 VM + Ubuntu install (interactive user step). Plan: `docs/superpowers/plans/2026-11-14-phase4-soar.md`.
+1. User provides **VirusTotal API key**: add to `lab/runbook/.local-credentials.md` (gitignored) as `VirusTotal API key: <key>`.
+2. n8n → Credentials → **Header Auth**: Name `x-apikey`, Value = VT key.
+3. Build the 7-node workflow (order + names matter — see below).
+4. Smoke-test with a manual POST, export `lab/soar01/workflow.json` (+ `workflow.md`), commit.
 
-## Phase 4 SOAR — locked decisions (from design spec)
+### Workflow (7 nodes) — exact order & names
+1. **Webhook** (trigger): Method `POST`, Path `soar`, Respond `Immediately`. Production URL `http://10.10.30.20:5678/webhook/soar`.
+2. **Code** `extract` (Run Once for All Items):
+   `const a = $input.first().json; return { alert_id: a.id, rule_id: a.rule?.id, agent: a.agent?.name, timestamp: a.timestamp, domain: a.data?.win?.eventdata?.queryName || null, raw: a };`
+3. **HTTP Request** `vt-lookup`: `GET https://www.virustotal.com/api/v3/domains/{{ $json.domain }}`, Auth = the `x-apikey` Header Auth credential.
+4. **Code** `build-incident` (Run Once for All Items): see plan §Task 6 Step 2 (extracts VT verdict → incident/notification/audit objects).
+5. **Read/Write Files** `write-incident`: Write `/srv/soar/incidents/{{ $json.alert_id }}.json`, data `{{ JSON.stringify($json.incident) }}`.
+6. **Read/Write Files** `write-notification`: Write `/srv/soar/notifications/latest.json`, data `{{ JSON.stringify($json.notification) }}`.
+7. **Code** `write-audit` (audit append — `N8N_CODE_ENABLE_BUILTIN_MODULES=fs` already enabled):
+   `const { appendFileSync } = require('fs'); appendFileSync('/srv/soar/audit.log', JSON.stringify($input.first().json.audit) + '\n'); return $input.first().json;`
 
-- **Tool**: n8n on SOAR01 — Docker Engine (not Desktop), single container, SQLite, queue off. 1 vCPU / 2 GB / 20 GB. host-only `10.10.30.20` (n8n `:5678`) + temporary NAT (attach only during VT demo).
-- **n8n env**: `EXECUTIONS_DATA_PRUNE=true`, `EXECUTIONS_DATA_MAX_AGE=168`, `N8N_METRICS=false`, no workers.
-- **Trigger**: Sysmon **EID 22** (DNS query) on WIN01 → Wazuh rule **100047** (level 12, MITRE T1071.004, group `dns,lab,soar,`) matching `win.eventdata.queryName` = `<MALICIOUS_DOMAIN>` (VT-verified at demo time).
-- **Bridge**: Wazuh integration `forward-to-n8n` → POST rule-100047 alert JSON to n8n webhook `/webhook/soar`.
-- **Workflow (7 nodes)**: Webhook → extract (Code) → VT domain lookup (HTTP) → build-incident (Code) → write incident/notification/audit under bind-mounted `/srv/soar`.
-- **Safe action**: local analyst notification (`/srv/soar/notifications/latest.json`) + incident record + audit line. No destructive active response.
-- **Power-on set S4**: SOC01 + WIN01 + SOAR01 (11 GB; DC01 + NDR01 OFF).
-- **Secrets**: VT key in `lab/runbook/.local-credentials.md` (gitignored) + n8n credential only; never committed/exported.
-- **UC-13** exit gate; MITRE T1071.004; `<MALICIOUS_DOMAIN>` chosen + VT-verified immediately before demo (`malicious > 0`).
+Full JS for `build-incident` + expression list: `docs/superpowers/plans/2026-11-14-phase4-soar.md` Task 6.
 
-## Notes carried over
+## Phase 4 SOAR — locked decisions (design spec)
 
-- **Remote control**: plink from host. SOC01: `plink -batch -hostkey SHA256:h9rirGAifvJjmZK2Ppdc177c72FOewK6EDwjKUKAyoo -pw <PW> socadmin@10.10.30.10` (host-only; NOT 10.10.10.5). **NDR01 has NO NAT now** — reach it ONLY via SOC01 hop: `plink ... socadmin@10.10.30.10` then `ssh ndradmin@10.10.10.40` (key auth set up). The old `-P 2223 ndradmin@127.0.0.1` is GONE (NAT detached). sudo = `echo <PW> | sudo -S`.
-- **plink quoting**: NEVER use `\"` inside a PowerShell double-quoted remote command. For anything non-trivial, write a `.sh` in `C:\Users\pedro\AppData\Local\Temp\opencode\` and run `plink ... -m <file>`.
-- **sudo grep self-match**: `sudo grep <phrase> alerts.json` adds a rule-5402 self-alert per run; filter `grep -v COMMAND`. Grep the description phrase (JSON `"id":"1000xx"` is not plain `id:1000xx`).
-- **Custom Wazuh rules** in `/var/ossec/etc/rules/local_rules.xml` (repo `lab/soc01/local_rules.xml`). Suricata-sourced rules MUST be children of built-in 86601 (`<if_sid>86601</if_sid>`), keyed on `<field name="alert.signature_id">` (dotted, NO `data.` prefix). `signature_id` is a NUMBER in eve.json, a STRING in Wazuh alerts.
-- **Test-NetConnection gotcha (UC-08)**: `Test-NetConnection -Port <closed>` retransmits SYN ~5× and trips SYN-count thresholds; use a single non-blocking `BeginConnect` for a 1-SYN benign control.
-- **Clock**: no NTP anywhere; Linux VMs STALL when the host is off/sleeping (WIN01 stays synced via Guest Additions). After ANY resume, `date` on SOC01/NDR01/DC01 first, fix with `timedatectl set-ntp off` + `set-time`, then restart Suricata (stale flow/threshold state).
-- **SMB (UC-11) gotchas**: 445 is firewalled by default on WIN01 (open via elevated `Set-NetFirewallRule -DisplayGroup "File and Printer Sharing" -Enabled True`). `smbclient.py` hangs against a filtered 445. Windows rate-limits failed SMB logons ~2s → use CONCURRENT attempts to hit the 10/30s threshold. A real brute force LOCKS the account (recover via `pre-uc06` snapshot restore).
-- **Wazuh API**: `token=$(curl -ks -u 'wazuh:<apiPw>' -X POST https://127.0.0.1:55000/security/user/authenticate | jq -r .data.token)`; api password has a TRAILING PERIOD.
-- **Indexer**: admin password is NOT `admin:admin`; filebeat auths via `/etc/filebeat/filebeat.keystore` (no `show` subcommand).
-- **alerts.json** rotates daily → older alerts in `alerts/YYYY/Mmm/` rotated files; `zgrep` them.
-- **jq gotcha**: `.rule.id` is a STRING — compare to a quoted string.
-- **User runs all attack simulations**; assistant builds/tunes/verifies. Lab is left attack-ready on purpose — do NOT run cleanup/revert without asking.
-- Secrets: `lab/runbook/.local-credentials.md` (gitignored). NDR01 `ndradmin/ndradmin123`; SOC01 `socadmin/socadmin123`; WIN01 `labadmin/labadmin123`; Wazuh API `wazuh:<apiPw>`.
+- **Tool**: n8n on SOAR01, Docker Engine, single container, SQLite, queue off. 1 vCPU / 2 GB / 20 GB. host-only `10.10.30.20` (`:5678`) + temporary NAT (detach in Task 8).
+- **n8n env (container)**: `EXECUTIONS_DATA_PRUNE=true`, `EXECUTIONS_DATA_MAX_AGE=168`, `N8N_METRICS=false`, `N8N_SECURE_COOKIE=false`, `N8N_CODE_ENABLE_BUILTIN_MODULES=fs`. Volume `/srv/n8n:/home/node/.n8n`.
+- **Trigger**: Sysmon EID 22 → rule **100047** (level 12, T1071.004, `dns,lab,soar,`) on `win.eventdata.queryName` = `<MALICIOUS_DOMAIN>` (VT-verified at demo). **Current placeholder: `malware.wicar.org` — swap in Task 7.**
+- **Bridge**: Wazuh integration **`custom-forward-to-n8n`** (custom- prefix REQUIRED) → POST alert JSON to `/webhook/soar`.
+- **Safe action**: notification + incident + audit under `/srv/soar`. No destructive response.
+- **S4**: SOC01 + WIN01 + SOAR01 (11 GB; DC01 + NDR01 OFF).
+- **Secrets**: VT key only in `.local-credentials.md` + n8n credential; never in git.
+
+## Notes carried over (still valid)
+
+- **Remote control**: plink from host. SOC01 `plink -batch -hostkey SHA256:h9rirGAifvJjmZK2Ppdc177c72FOewK6EDwjKUKAyoo -pw socadmin123 socadmin@10.10.30.10`. **SOAR01** `plink -batch -hostkey SHA256:L0z4KGt1aq87MtiZCTB+7+JAlCl3dFOrveJK/YsKK/E -pw soaradmin123 soaradmin@10.10.30.20` (also NAT fwd `-P 2224 soaradmin@127.0.0.1`). NDR01 = SOC01 hop only (no NAT). DC01 = SOC01 hop / natpf 2222. sudo = `echo <PW> | sudo -S`.
+- **plink quoting**: NEVER use `\"` in a PowerShell double-quoted remote command. For anything non-trivial, write a `.sh` in `C:\Users\pedro\AppData\Local\Temp\opencode\` and run `plink ... -m <file>`; or pscp a file + `sudo mv`.
+- **Wazuh 4.14 locations**: built-in rules in `/var/ossec/ruleset/rules/` (NOT `/var/ossec/etc/rules/`). Custom rules in `/var/ossec/etc/rules/local_rules.xml` (repo `lab/soc01/local_rules.xml`). Sysmon EID 22 group = `sysmon_event_22` (built-in rule 61650). Field names: Sysmon `win.eventdata.*`; NDR `alert.signature_id` (child of 86601).
+- **Wazuh integration interface (4.14)**: script args = `$1` alert-JSON file path, `$2` api_key, `$3` hook_url. Custom scripts MUST be named `custom-*`. Ownership `root:wazuh`, `chmod 750`.
+- **ossec.conf has TWO `<ossec_config>` blocks** (Phase 2 duplicate) — insert additions before the FIRST `</ossec_config>`.
+- **Clock**: no NTP; Linux VMs stall on host sleep. Check `date` on SOC01/SOAR01 after ANY resume; fix `timedatectl set-ntp off` + `set-time` + restart wazuh-manager (and re-check Suricata if NDR01 were on). WIN01 stays synced via Guest Additions.
+- **guestcontrol is NON-elevated** on WIN01 — can't run Sysmon reload / reg add / firewall changes. Those need the user in an elevated PowerShell (switch WIN01 to GUI if needed).
+- **Host-only adapter #2 DHCP is MISCONFIGURED** (serves `192.168.56.x` on the `10.10.30.0/24` wire) — always use STATIC IPs on new host-only VMs; don't rely on DHCP.
+- **sudo grep self-match** → rule-5402; filter `grep -v COMMAND`; grep the description phrase not `id:...`.
+- **Wazuh API**: `token=$(curl -ks -u 'wazuh:<apiPw>' -X POST https://127.0.0.1:55000/security/user/authenticate | jq -r .data.token)`; api pw has a TRAILING PERIOD. Indexer admin = `admin:3e7Rzku4MNktFJQZ.Pxo?P0tTsAVt0jD` (single-node yellow is normal).
+- **alerts.json** rotates daily; `zgrep` older rotated files. jq `.rule.id` is a STRING.
+- **User runs all attack simulations** (DNS lookups); assistant builds/tunes/verifies. Lab left attack-ready — don't cleanup/revert without asking.
+- Secrets in `lab/runbook/.local-credentials.md` (gitignored). SOC01 `socadmin/socadmin123`; WIN01 `labadmin/labadmin123`; SOAR01 `soaradmin/soaradmin123`; Wazuh API `wazuh:1O58pEByLzeNx27aHgsZYp2L+R5pyga.`; domain admin `Administrator/DomAdmin!lab123`; attacker `Attacker!lab123`, victim `Victim!lab123`, svc-sql `SvcSQL!lab123`.
