@@ -1,16 +1,16 @@
 # Virtual SOC Lab
 
 > A free, reproducible blue-team lab. Every detection is a simulated attack you can
-> re-run, an alert with evidence behind it, and — for the automated case — a response
-> you can audit.
+> re-run and an alert with evidence behind it. One case continues into an automated,
+> auditable response.
 
 This is a hands-on SOC (Security Operations Center) built entirely with free software on a
 single 16 GB Windows host with VirtualBox. It emulates a small company: a Windows endpoint,
 an Active Directory domain, a network sensor, a SIEM, and an automation platform. It exists
 to answer one question with evidence rather than screenshots of installed tools:
 
-**Can a documented attack produce a reproducible alert, be investigated, and trigger a
-controlled automated response?**
+**Can a documented attack produce a reproducible alert that can be investigated — and,
+where the lab integrates automation, a controlled response that can be audited?**
 
 Everything needed to rebuild it, run the exercises, and verify the results is in this
 repository.
@@ -49,6 +49,15 @@ procedure, expected events, rule, evidence, false positives, and cleanup.
 
 No commercial licences, no paid tiers, no real malware required.
 
+### Capabilities demonstrated
+
+The portfolio spans four detection layers, not a single trick repeated:
+
+- **Endpoint detection** (UC-00…UC-02) — file integrity, LSASS credential access, encoded PowerShell.
+- **Identity and Kerberos abuse** (UC-03…UC-05) — logon bursts, privileged group changes, Kerberoasting, AS-REP roasting.
+- **Network detection** (UC-06…UC-12) — port scans, beaconing, ICMP tunnels, DNS anomalies, SMB brute force, cleartext FTP.
+- **Automation** (UC-13) — one alert path that enriches, notifies, and audits end to end.
+
 ### Architecture
 
 ![Data flow diagram](docs/DFD.PNG)
@@ -61,8 +70,8 @@ Two isolated networks (plus host-only management); no bridged adapters:
 | LAB-CORP (internal) | `10.10.10.0/24` | SOC01 `.5`, WIN01 `.20`, DC01 `.10`, NDR01 `.40` |
 
 NAT adapters are used only for package installation and are detached after each build, so
-the finished lab has no Internet path. The exception is the UC-13 demo, which temporarily
-re-attaches SOAR01's NAT adapter to query VirusTotal.
+the finished lab has no Internet path. The exception is the automation demo, which
+temporarily re-attaches SOAR01's NAT adapter to query VirusTotal.
 
 ### Power-on scenarios
 
@@ -103,14 +112,12 @@ UC-00 uses built-in FIM rules. Each row links to its case note.
 | [UC-12 Cleartext FTP](lab/cases/uc-12-t1040-cleartext-ftp.md) | T1040 | Suricata | `100046` | 10 | S3 |
 | [UC-13 DNS → VirusTotal → SOAR](lab/cases/uc-13-soar-vt-enrichment.md) | T1071.004 | Sysmon EID 22 → Wazuh → n8n | `100047` | 12 | S4 |
 
-The full incident chain for UC-13:
+Each host, identity, and network case follows the same pattern: telemetry → SIEM rule →
+investigation → benign control. The automation phase adds one extra hop to a single case:
 
 ```
-Sysmon DNS query (WIN01)
-  → Wazuh rule 100047 (SOC01)
-  → integratord custom-forward-to-n8n webhook
-  → n8n workflow (SOAR01) → VirusTotal domain report
-  → incident.json + notification.json + audit.log (/srv/soar)
+Sysmon DNS query (WIN01) → Wazuh rule 100047 (SOC01) → n8n webhook (SOAR01)
+  → VirusTotal domain report → incident + notification + audit (/srv/soar)
 ```
 
 ---
@@ -168,11 +175,11 @@ control, and cleanup. Per-VM runbooks and teaching walkthroughs are in
 
 ## Evidence
 
-Results are exported, not just described:
+Results are exported for every phase, not just described:
 
-- [`lab/evidence/phase4-alerts.json`](lab/evidence/phase4-alerts.json) — UC-13 Wazuh alerts
-- [`lab/evidence/phase4-incident.json`](lab/evidence/phase4-incident.json) — SOAR incident output
-- [`lab/evidence/`](lab/evidence/) — phase 2/3 captures and UC-01…UC-12 alert screenshots
+- [`lab/evidence/milestone1-alerts.jsonl`](lab/evidence/milestone1-alerts.jsonl) — phase 1 alerts (UC-00/UC-01)
+- [`lab/evidence/`](lab/evidence/) — phase 2 identity captures, phase 3 NDR alerts, and phase 4 alert/incident JSON
+- [`lab/evidence/`](lab/evidence/) — alert screenshots for UC-01…UC-12
 - [`lab/cases/exercise-log.md`](lab/cases/exercise-log.md) — expected vs observed for every run
 
 How to export, and what must never be committed, is in
@@ -239,6 +246,7 @@ These are documented explicitly rather than hidden; see [`lab/README.md`](lab/RE
 
 ## Status
 
-**Phase 4 complete.** UC-13 passes end to end twice (alert → n8n → VirusTotal →
-incident/notification/audit), with a benign control that stays silent. All prior use cases
-(UC-00…UC-12) pass with recorded evidence. Phase 5 is not scheduled.
+**All four phases are complete.** Fifteen exercises (UC-00…UC-13, including UC-03b) pass
+with recorded evidence, each with a benign control: file integrity and endpoint detections,
+identity and Kerberos abuse, network detections, and one end-to-end automation chain.
+Phase 5 is not scheduled.
