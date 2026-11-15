@@ -75,10 +75,26 @@ Evidence: `lab/evidence/phase4-alerts.json`, `lab/evidence/phase4-incident.json`
 `Resolve-DnsName -Type TXT example.com` produced a Sysmon EID 22 event (status 1460) but **zero**
 rule-100047 alerts — the pipeline stayed live (background DNS continued to flow).
 
-## False positives
-The rule is an IOC substring match, so in the isolated lab it has zero false positives by construction
-(only the deliberate query matches). In production, `malware.wicar.org` is a known malware-test domain;
-a real deployment would drive this rule from a threat-intel feed and maintain allowlists.
+## Tuning (FP vs TP)
+- **True positive shape:** a Sysmon EID 22 `queryName` containing `malware.wicar.org`. TP = the deliberate
+  lab lookup; every run raised exactly one 100047 alert.
+- **False positives:** zero by construction in this isolated lab — the regex is an IOC substring, so only
+  the deliberate query matches. Background DNS (`go.microsoft.com`, `ecs.office.com`, `example.com`) never
+  matches.
+- **Substring vs anchored:** `(?i)malware\.wicar\.org` is intentionally unanchored so it also catches
+  `*.malware.wicar.org` subdomains (DGA-ish C2 under a known-bad parent). If look-alike matches become a
+  problem, anchor it: `(?i)(^|\.)malware\.wicar\.org$`.
+- **Severity:** rule level 12; the n8n notification severity is driven by the VirusTotal malicious count
+  (≥1 malicious → `high`). A VT "not found" (unknown domain) is a tuning gap — the HTTP node currently
+  errors and stops the workflow rather than degrading gracefully (see Troubleshooting).
+- **Production tuning:** drive the rule from a threat-intel feed (not a hard-coded IOC), maintain
+  allowlists, and add dedup/rate-limiting so repeated queries from one host do not page repeatedly.
+
+## Evidence
+- `lab/evidence/phase4-alerts.json` — the rule-100047 alert (run 2).
+- `lab/evidence/phase4-incident.json` — the enrichment incident written by n8n.
+- Dashboard screenshot `lab/evidence/uc-13-alert.png` — capture in Wazuh Discover
+  (`rule.id:100047`) while the lab is powered on (not yet captured).
 
 ## Cleanup
 - SOAR01 NAT detached (`--nic2 none`) and snapshot `base-phase4` taken (2026-11-15).

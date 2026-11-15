@@ -68,6 +68,32 @@ The exact process used for rule 100010 (UC-01). Follow it for every new detectio
 - Deploy commands → `lab/runbook/setup.md` new subsection.
 - Commit with a conventional message.
 
+## Phase 4 — SOAR / automation addendum (confirmed 2026-11-15, UC-13)
+
+When a detection must **trigger automation** (not just alert), extend the recipe:
+
+1. **Source + rule are unchanged** — still Sysmon EID 22 → custom rule (100047) in `local_rules.xml`.
+   Nothing about the detection logic changes; automation is a consumer of the alert.
+2. **Bridge on the rule id, not on "all alerts".** Wazuh `integratord` runs the integration only for the
+   configured `rule_id`. In 4.14 the integration script receives `$1`=alert JSON file, `$2`=api_key,
+   `$3`=hook_url; custom scripts MUST be named `custom-*`. The script POSTs the full alert JSON to n8n.
+3. **Verify the bridge server-side:** `/var/ossec/logs/integrations.log` must show
+   `custom-forward-to-n8n: {"message":"Workflow was started"}HTTP:200` for each alert.
+4. **n8n 2.x gotchas (cost real debugging time):**
+   - activation = **Publish** (a DB `active=1` alone does NOT register the webhook);
+   - expression fields need a leading `=`;
+   - the Webhook node nests the POST body under `json.body`;
+   - `require('fs')` in Code nodes needs `NODE_FUNCTION_ALLOW_BUILTIN=fs`.
+5. **External enrichment can fail and stop the run.** VirusTotal returns 404 for unknown domains; the
+   HTTP node errors on non-2xx, so the workflow never reaches the write nodes. Use a domain VT knows, or
+   make the node tolerate errors and degrade gracefully.
+6. **Evidence is the output artifacts**, not just the alert: the incident JSON (alert + enrichment),
+   the notification, and the audit line under `/srv/soar`. Save the alert + incident to `lab/evidence/`.
+7. **Demo reproducibility gotcha:** the exact malicious domain can be suppressed by the endpoint (Windows
+   DNS negative cache that `flushdns` won't clear → reboot WIN01; Defender blocking the exact known-bad
+   name at the DNS layer → disable real-time for the demo). A fresh `*.malware.wicar.org` subdomain is
+   cache-proof but VT-unknown; use the cached name after a WIN01 reboot.
+
 ## Phase 2 — Samba/KDC decoded field map (confirmed 2026-10-23, wazuh-logtest)
 
 Three log sources on DC01, all shipping to manager agent `002` (`dc01`):
