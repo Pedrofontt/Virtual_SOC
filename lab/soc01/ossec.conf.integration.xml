@@ -1,0 +1,6 @@
+<integration>
+  <name>custom-forward-to-n8n</name>
+  <hook_url>http://10.10.30.20:5678/webhook/soar</hook_url>
+  <rule_id>100047</rule_id>
+  <alert_format>json</alert_format>
+</integration>
