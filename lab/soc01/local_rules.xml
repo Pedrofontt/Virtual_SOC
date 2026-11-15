@@ -1,4 +1,4 @@
-﻿<!-- Local rules -->
+<!-- Local rules -->
 <!-- Modify it at your will. -->
 <!-- Copyright (C) 2015, Wazuh Inc. -->
 
@@ -115,5 +115,12 @@
     <description>LAB NDR: cleartext FTP credentials</description>
     <group>ndr,lab,credential_access,</group>
     <mitre><id>T1040</id></mitre>
+  </rule>
+  <rule id="100047" level="12">
+    <if_group>sysmon_event_22</if_group>
+    <field name="win.eventdata.queryName" type="pcre2">(?i)malware\.wicar\.org</field>
+    <description>LAB SOAR: DNS query to known-malicious domain - $(win.eventdata.queryName)</description>
+    <group>dns,lab,soar,</group>
+    <mitre><id>T1071.004</id></mitre>
   </rule>
 </group>
