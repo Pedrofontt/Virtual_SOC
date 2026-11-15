@@ -204,3 +204,48 @@ Written as problem -> symptom -> root cause -> fix. Setup commands live in `setu
    `grep '"signature_id":7000006' eve.json` matches nothing because Suricata emits
    `"signature_id": 7000006` (numeric, optional space). Grep loose (`7000006`) or jq the number;
    in Wazuh alerts it is the string `"7000006"`.
+
+## Phase 4 SOAR (UC-13, 2026-11-15)
+
+1. **n8n 2.x "active" ≠ webhook registered — you must Publish.**
+   Problem: setting `workflow_entity.active=1` did not make `/webhook/soar` respond.
+   Root cause: activation in 2.x is a publish pipeline (`workflow_publication_outbox` →
+   `workflow_publication_trigger_status` with `status=activated`, `triggerKind=persisted`); the DB flag
+   alone is not enough. Fix: use the UI **Publish** (or run the full publication flow). A container
+   restart re-registers already-published webhooks.
+
+2. **n8n expression fields need a leading `=`.**
+   Symptom: the VT URL was sent literally as `{{ $json.domain }}` → 404.
+   Fix: `=https://www.virustotal.com/api/v3/domains/{{ $json.domain }}` (no space after `=`).
+
+3. **The Webhook node nests the POST body under `json.body`.**
+   The integration sends the alert JSON as the request body; the node output is
+   `{headers,query,params,body,webhookUrl,executionMode}`. Fix: `const body = a.body ?? a;`.
+
+4. **`require('fs')` is blocked in Code nodes by the task-runner sandbox.**
+   The 1.x `N8N_CODE_ENABLE_BUILTIN_MODULES` is ignored in 2.x. Fix: set
+   `NODE_FUNCTION_ALLOW_BUILTIN=fs` on the container.
+
+5. **VirusTotal 404s on unknown domains, and that stops the whole workflow.**
+   Symptom: a fabricated subdomain (`zzq7x1.malware.wicar.org`) fired rule 100047 and the integration
+   returned 200 ("Workflow was started"), but no files were written.
+   Root cause: the HTTP Request node errors on non-2xx, so the run ends before the write nodes.
+   Fix: use a domain VT actually knows (malicious > 0) — or set the node to never-error and have
+   `build-incident` handle a missing verdict.
+
+6. **The exact malicious domain sticks in the Windows DNS negative cache.**
+   Symptom: `Resolve-DnsName malware.wicar.org` timed out, but Sysmon logged nothing even after
+   `ipconfig /flushdns` and with an empty `Get-DnsClientCache`.
+   Root cause: the negative (timeout) entry persists in the DNS Client service; `dnscache` is a
+   protected service (`Restart-Service dnscache` → "Cannot open ... service").
+   Fix: **reboot WIN01** to clear it (power-cycling the VM does the same).
+
+7. **Defender starts blocking the exact malicious domain at the DNS layer.**
+   Symptom: after a signature update, the exact `malware.wicar.org` produced no Sysmon EID 22 (even with
+   the cache cleared), while a fresh `probeNNN.malware.wicar.org` logged normally and fired the rule.
+   Root cause: Defender (real-time/NIS) intercepts lookups of the now-known-bad exact name before Sysmon.
+   Fix: disable real-time protection (Tamper off) for the demo, and reboot so the cache is also clear.
+
+8. **Sysmon EID 22 only logs real wire queries.** A name answered from cache/hosts emits no event —
+   use a fresh subdomain to tell "pipeline broken" apart from "query suppressed".
+

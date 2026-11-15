@@ -1,10 +1,10 @@
 # Session state — resume here
 
-Last updated: 2026-11-15 (Phase 4 SOAR **Tasks 0–7 complete** — UC-13 demo reproduced end-to-end; evidence exported). Resume by reading this file; next is **Task 8 close-out**.
+Last updated: 2026-11-15 (Phase 4 SOAR **COMPLETE — Tasks 0–8**; UC-13 demo PASS + close-out; snapshot `base-phase4`; all VMs powered off). Resume by reading this file; next = Phase 5 / optional.
 
-## Where we are — PHASE 3 NDR: COMPLETE; PHASE 4 SOAR: TASK 8/9
+## Where we are — PHASE 3 NDR: COMPLETE; PHASE 4 SOAR: COMPLETE (9/9)
 
-Phase 3 NDR (UC-06..12) done + committed. Phase 4 SOAR (UC-13) execution in progress:
+Phase 3 NDR (UC-06..12) done + committed. Phase 4 SOAR (UC-13) done + committed:
 
 - **Task 0** pre-flight: DONE (S4 power-on, WIN01 snapshot `pre-soar`, SOC01 clock fixed).
 - **Task 1** SOAR01 VM: DONE (Ubuntu 24.04, `soaradmin`, static `10.10.30.20/24`, NAT `10.0.3.0/24`).
@@ -14,19 +14,19 @@ Phase 3 NDR (UC-06..12) done + committed. Phase 4 SOAR (UC-13) execution in prog
 - **Task 5** Wazuh→n8n integration: DONE (`custom-forward-to-n8n`).
 - **Task 6** n8n workflow: DONE + **smoke-test PASSED** (manual POST `google.com` → VT verdict + files written). Committed `3bb61eb`.
 - **Task 7** UC-13 demo: DONE — rule 100047 → integration → n8n verified end-to-end **twice** (18:55 and 20:12 alerts; incidents, notification, audit written). Evidence exported to `lab/evidence/`.
-- **Task 8** close-out: not started.
+- **Task 8** close-out: DONE — SOAR01 NAT detached, snapshot `base-phase4`; docs written (`uc-13`, `soar01.md`, `soar01-walkthrough.md`, `setup.md` §5, exercise-log, lessons-learned); all VMs powered off.
 
-## Current lab state (SOC01/WIN01/SOAR01 RUNNING — ready for next demo, 2026-11-15)
+## Current lab state (ALL VMs OFF — Phase 4 closed, 2026-11-15)
 
-- **SOC01**: running. Wazuh 4.14.8 healthy (cluster `yellow` = normal single-node). Rule **100047** live. Integration `custom-forward-to-n8n` wired (rule 100047 → `http://10.10.30.20:5678/webhook/soar`). Clock synced.
-- **WIN01**: running. Sysmon EID 22 (DNS) enabled. **Defender real-time OFF + tamper OFF** (for demos; re-enable after). Snapshot **`pre-soar`**. Sysmon64.exe `C:\lab\tools\Sysmon64.exe`, config `C:\lab\sysmon-config.xml`. **guestcontrol NON-elevated** → elevated WIN01 ops require the USER.
-- **SOAR01**: running. n8n `:5678` up (container `n8n`), workflow id `uw47iA9RnDEEyCrS` published (7 nodes). NAT still attached (detach in Task 8). `/srv/soar` holds 2 demo incidents + notification + audit.
+- **SOC01**: poweroff. Wazuh 4.14.8 healthy when running (cluster `yellow` = normal single-node). Rule **100047** live; integration `custom-forward-to-n8n` wired (rule 100047 → `http://10.10.30.20:5678/webhook/soar`).
+- **WIN01**: poweroff. Sysmon EID 22 (DNS) enabled. Snapshot **`pre-soar`**. Defender real-time was left OFF after demos — re-enable (`Set-MpPreference -DisableRealtimeMonitoring $false` + Tamper on) before normal use. Sysmon64.exe `C:\lab\tools\Sysmon64.exe`.
+- **SOAR01**: poweroff. n8n `:5678` (container `n8n`), workflow id `uw47iA9RnDEEyCrS` published (7 nodes). **NAT detached** (`nic2 none`); snapshot **`base-phase4`** (UUID `f418912c`). `/srv/soar` holds 2 demo incidents + notification + audit.
 - **DC01**: poweroff. **NDR01**: saved-state. Correct for S4.
-- **Repo**: see `git log`; Phase 4 commits include `844ae2e`…`514dd4c`, workflow `3bb61eb`, ledger `0f536cf`, Task 7 evidence.
+- **Repo**: see `git log`; Phase 4 commits include `844ae2e`…`514dd4c`, workflow `3bb61eb`, ledger `0f536cf`, Task 7 evidence `fc8e965`, Task 8 final commit.
 
-## Next — Task 8 close-out (after any live demos)
+## Reproducing the UC-13 demo (for live runs)
 
-### Reproducing the UC-13 demo (every live run)
+Steps:
 IMPORTANT: exact `malware.wicar.org` sticks in WIN01's DNS **negative cache**; `ipconfig /flushdns` does NOT clear it and `dnscache` is a protected service. A WIN01 **reboot** clears it (power-cycling the VM does too). Defender real-time also blocks the exact domain (tamper is OFF in the lab).
 
 1. Power on **SOC01, WIN01, SOAR01** (S4). Re-check clocks.
@@ -39,8 +39,8 @@ IMPORTANT: exact `malware.wicar.org` sticks in WIN01's DNS **negative cache**; `
 
 Gotchas: unique subdomains are cache-proof but VT returns 404 (workflow stops). Typos (`==`, `.com`) either 404 or don't match the rule. After demos, re-enable Defender: `Set-MpPreference -DisableRealtimeMonitoring $false`.
 
-### Task 8 close-out
-1. Detach SOAR01 NAT (keep host-only). 2. Refresh this file / runbook / ledger. 3. Acceptance.
+### Phase 5 / optional next
+Phase 4 is complete (Task 8 exit gate green). Optional next: Phase 5 design, or polish/presentation. Re-enable WIN01 Defender before any non-demo use.
 
 ### Task 6 workflow (7 nodes) — actual built names
 1. **Webhook** (trigger): Method `POST`, Path `soar`, Respond `Immediately`; `webhookId` `df4927e2-a3ad-4bfe-8201-0692ce96bf10`. URL `http://10.10.30.20:5678/webhook/soar`.

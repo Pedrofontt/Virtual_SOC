@@ -29,3 +29,7 @@
 | 2026-11-01 | UC-10 DNS anomaly | rule 100044 | 100044 lvl 12 T1071.004 05:09:59Z (UDP, 10.10.10.20→10.10.10.5); benign nslookup silent | n/a |
 | 2026-11-02 | UC-11 SMB brute force | rule 100045 | 100045 lvl 12 T1110 01:42:38Z (10.10.10.5→10.10.10.20:445); benign single logon silent | n/a (445 left open) |
 | 2026-11-02 | UC-12 cleartext FTP | rule 100046 | 100046 lvl 10 T1040 01:54:03Z (10.10.10.20→10.10.10.5:21); benign silent | n/a |
+| 2026-11-15 | UC-13 n8n smoke (manual POST google.com) | workflow writes files | VT verdict (malicious 1) + incident/notify/audit written | n/a |
+| 2026-11-15 | UC-13 SOAR VT enrichment run 1 | rule 100047 → n8n VT → files | 100047 lvl 12 T1071.004 18:55:10Z (`malware.wicar.org`); VT 17 malicious; incident/notify/audit written | n/a |
+| 2026-11-15 | UC-13 SOAR VT enrichment run 2 | (same) | 100047 lvl 12 20:12:18Z; VT 17 malicious, reputation -60; files written | NAT detached + snapshot `base-phase4` |
+| 2026-11-15 | UC-13 benign (`example.com`) | no 100047 | Sysmon EID 22 logged, no 100047 alert | n/a |

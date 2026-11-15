@@ -363,3 +363,87 @@ VBoxManage snapshot NDR01 take base-phase3
 VBoxManage startvm NDR01 --type headless
 ```
 
+---
+
+## 5. SOAR01 — n8n SOAR automation (Ubuntu 24.04.5)
+
+Automation box on the host-only management network. 1 vCPU / 2 GB RAM / 20 GB disk.
+Static `10.10.30.20/24` (VirtualBox Host-Only Adapter #2). Host key
+`SHA256:L0z4KGt1aq87MtiZCTB+7+JAlCl3dFOrveJK/YsKK/E`; ssh NAT forward `127.0.0.1:2224`
+(detached before snapshot). Reachable from the host directly at `10.10.30.20`.
+
+### 5.1 Create VM + disk (host)
+```powershell
+VBoxManage createvm --name SOAR01 --ostype Ubuntu_64 --register
+VBoxManage modifyvm SOAR01 --memory 2048 --cpus 1 --vram 16
+VBoxManage modifyvm SOAR01 --nic1 hostonly --hostonlyadapter1 "VirtualBox Host-Only Ethernet Adapter #2" `
+  --nic2 nat --natpf2 "ssh,tcp,127.0.0.1,2224,,22"
+VBoxManage createmedium disk --filename C:\lab-vms\SOAR01\soar01.vdi --size 20480
+VBoxManage storagectl SOAR01 --name SATA --add sata --controller IntelAhci --bootable on
+VBoxManage storageattach SOAR01 --storagectl SATA --port 0 --device 0 --type hdd --medium C:\lab-vms\SOAR01\soar01.vdi
+VBoxManage storageattach SOAR01 --storagectl SATA --port 1 --device 0 --type dvddrive --medium C:\iso\ubuntu-24.04.5-live-server-amd64.iso
+VBoxManage startvm SOAR01
+```
+
+### 5.2 Install Ubuntu (interactive)
+Ubuntu Server 24.04.5 minimal, user `soaradmin`, enable OpenSSH (password auth). Full disk, no LVM.
+
+### 5.3 Static IP (netplan)
+```bash
+# netplan enp0s3 -> 10.10.30.20/24  (host-only management)
+sudo netplan apply
+```
+
+### 5.4 Docker Engine 29.x
+```bash
+sudo apt update && sudo apt install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" | sudo tee /etc/apt/sources.list.d/docker.list
+sudo apt update && sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+docker --version
+```
+
+### 5.5 n8n container + output dirs
+```bash
+sudo mkdir -p /srv/soar/incidents /srv/soar/notifications /srv/n8n
+sudo chmod -R 777 /srv/soar
+sudo docker run -d --name n8n --restart unless-stopped \
+  -p 5678:5678 \
+  -v /srv/soar:/srv/soar \
+  -v /srv/n8n:/home/node/.n8n \
+  -e EXECUTIONS_DATA_PRUNE=true -e EXECUTIONS_DATA_MAX_AGE=168 \
+  -e N8N_METRICS=false -e N8N_SECURE_COOKIE=false \
+  -e NODE_FUNCTION_ALLOW_BUILTIN=fs \
+  n8nio/n8n:latest
+```
+Note: `NODE_FUNCTION_ALLOW_BUILTIN=fs` (NOT the 1.x `N8N_CODE_ENABLE_BUILTIN_MODULES`) is what lets Code
+nodes `require('fs')`.
+
+### 5.6 Workflow, credential, Wazuh bridge
+- Import `lab/soar01/workflow.json` in the n8n UI. Create a **Header Auth** credential named `x-apikey`
+  with the VT key from `lab/runbook/.local-credentials.md`. **Publish** the workflow (2.x: Publish, not
+  just "active"; expression fields need a leading `=`).
+- On SOC01: integration `custom-forward-to-n8n` (script in `/var/ossec/integrations/`, args `$1` alert
+  file, `$2` api_key, `$3` hook_url) + `ossec.conf` block:
+  ```xml
+  <integration>
+    <name>custom-forward-to-n8n</name>
+    <hook_url>http://10.10.30.20:5678/webhook/soar</hook_url>
+    <rule_id>100047</rule_id>
+    <api_key>lab</api_key>
+  </integration>
+  ```
+  Then `sudo /var/ossec/bin/wazuh-control restart` and confirm
+  `Enabling integration for: 'custom-forward-to-n8n'` in `ossec.log`.
+
+### 5.7 Isolate + snapshot
+```powershell
+VBoxManage controlvm SOAR01 acpipowerbutton
+VBoxManage modifyvm SOAR01 --nic2 none        # detach NAT (re-attach only for VT demos)
+VBoxManage snapshot SOAR01 take base-phase4
+VBoxManage startvm SOAR01 --type headless
+```
+
+
