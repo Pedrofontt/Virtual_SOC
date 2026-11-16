@@ -25,17 +25,19 @@ notification + audit record — no human step in the loop.
   `Enabling integration for: 'custom-forward-to-n8n'`).
 - SOAR01 NAT attached for the VT call (detached after the demo). n8n workflow **published**
   (id `uw47iA9RnDEEyCrS`), webhook `POST /soar` registered.
-- WIN01: **Defender real-time protection OFF** (Tamper Protection off), and WIN01 **freshly rebooted**
-  (see Troubleshooting — the exact domain otherwise sticks in the DNS negative cache / gets blocked).
+- WIN01: **freshly booted** after any prior test (avoids the DNS negative cache). Defender
+  real-time may stay **ON** — verified working 2026-11-16; if the exact domain produces no
+  Sysmon EID 22, disable it interactively (Tamper is off) and reboot.
 
 ## Test procedure
 1. Confirm the DNS cache is clean: `Get-DnsClientCache -Name malware.wicar.org` → "No objects found".
-2. WIN01, elevated PowerShell:
+2. WIN01 (PowerShell; elevation not required):
    ```powershell
-   Set-MpPreference -DisableRealtimeMonitoring $true
    ipconfig /flushdns
    Resolve-DnsName -Type A malware.wicar.org      # timeout is expected
    ```
+   Optional only if the query yields no Sysmon EID 22: disable Defender real-time
+   interactively and reboot WIN01.
 3. Confirm Sysmon logged the query (`QueryStatus: 1460`) and Wazuh raised rule 100047.
 4. Confirm the integration POST in `/var/ossec/logs/integrations.log`
    (`custom-forward-to-n8n: {"message":"Workflow was started"}HTTP:200`).
@@ -45,12 +47,17 @@ notification + audit record — no human step in the loop.
 ## Expected vs observed
 Expected: rule 100047 (level 12) → integration HTTP 200 → n8n writes incident, notification, audit.
 
-Observed (two successful runs):
+Observed (successful runs):
 
 | Run | Wazuh alert id | Alert ts (UTC) | VT verdict (malicious/suspicious/harmless/undetected) | Reputation |
 |---|---|---|---|---|
 | 1 | 1794768910.1065381 | 2026-11-15T18:55:10Z | 17 / 1 / 41 / 33 | -60 |
 | 2 | 1794773538.1555595 | 2026-11-15T20:12:18Z | 17 / 1 / 41 / 33 | -60 |
+
+Verification run after the SOC01 snapshot restore: alert `1794788847.369773` at
+`2026-11-16T00:27:27Z` fired 100047 and wrote incident + notification + audit with Defender
+real-time **ON**; VirusTotal reported 16 vendors malicious. The same alert id was forwarded
+twice (two `HTTP:200` lines, two audit entries) — a known dedup gap, cosmetic for the demo.
 
 `integrations.log`:
 ```
@@ -104,6 +111,9 @@ rule-100047 alerts — the pipeline stayed live (background DNS continued to flo
 - Rule 100047 intentionally left deployed (part of the detection baseline).
 
 ## Troubleshooting notes
+- **Duplicate forwarding (observed 2026-11-16).** The same alert id was POSTed twice (two
+  `HTTP:200` lines, two audit entries). Cosmetic for the demo; the production fix is
+  deduplication on alert id (rate limit / seen-set).
 - **VT 404 stops the workflow.** A unique subdomain (e.g. `zzq7x1.malware.wicar.org`) is cache-proof and
   fires the rule, but VirusTotal has no record → HTTP 404 → the HTTP node errors and the run ends before
   writing files. Use a domain VT actually knows (malicious > 0).

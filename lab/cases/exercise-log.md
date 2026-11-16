@@ -33,3 +33,4 @@
 | 2026-11-15 | UC-13 SOAR VT enrichment run 1 | rule 100047 → n8n VT → files | 100047 lvl 12 T1071.004 18:55:10Z (`malware.wicar.org`); VT 17 malicious; incident/notify/audit written | n/a |
 | 2026-11-15 | UC-13 SOAR VT enrichment run 2 | (same) | 100047 lvl 12 20:12:18Z; VT 17 malicious, reputation -60; files written | NAT detached + snapshot `base-phase4` |
 | 2026-11-15 | UC-13 benign (`example.com`) | no 100047 | Sysmon EID 22 logged, no 100047 alert | n/a |
+| 2026-11-16 | UC-13 demo-ready preflight (Defender RT ON) | rule 100047 → n8n VT → files | 100047 lvl 12 00:27:27Z (`malware.wicar.org`); VT 16 malicious; incident/notify/audit written (same id forwarded twice) | clean shutdown + snapshots `demo-ready` |

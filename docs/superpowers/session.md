@@ -78,3 +78,27 @@ Phase 4 is complete (Task 8 exit gate green). Optional next: Phase 5 design, or 
 - **alerts.json** rotates daily; `zgrep` older rotated files. jq `.rule.id` is a STRING.
 - **User runs all attack simulations** (DNS lookups); assistant builds/tunes/verifies. Lab left attack-ready — don't cleanup/revert without asking.
 - Secrets in `lab/runbook/.local-credentials.md` (gitignored). SOC01 `socadmin/socadmin123`; WIN01 `labadmin/labadmin123`; SOAR01 `soaradmin/soaradmin123`; Wazuh API `wazuh:1O58pEByLzeNx27aHgsZYp2L+R5pyga.`; domain admin `Administrator/DomAdmin!lab123`; attacker `Attacker!lab123`, victim `Victim!lab123`, svc-sql `SvcSQL!lab123`.
+
+## Demo-ready state (2026-11-16)
+
+- **SOC01 would not boot** from its current overlay: initramfs stall, AHCI resets, RCU stall.
+  SOAR01 booted fine → SOC01-specific disk-overlay corruption. Safety snapshot
+  `broken-20261115` kept.
+- **Recovery:** restored snapshot `base-phase1-fixed`, then re-applied from the repo:
+  `lab/soc01/local_rules.xml` (16 rules incl. 100047), `lab/soc01/custom-forward-to-n8n`
+  (root:wazuh 750) + the `<integration>` block in `ossec.conf`, then restarted Wazuh.
+  Indexer + dashboard up; integratord running; agent 001 `Active` when WIN01 boots.
+- **SOC01 boot settings left at** 2 vCPUs and `paravirtprovider=none` (boot stability; no
+  demo impact). Documented deviation from setup.md (3 vCPUs).
+- **Live preflight** 2026-11-16T00:27:27Z: rule 100047 fired with **Defender real-time ON**;
+  VT 16 malicious; incident + notification + audit written. Same alert forwarded twice
+  (dedup gap, cosmetic).
+- **WIN01** left with Defender real-time **ON** (verified compatible). Clean shutdown clears
+  the DNS negative cache, so the next demo run is a fresh wire query.
+- **Snapshots `demo-ready`:** SOC01 `24844a31-5807-4751-b71a-38a7e13a2e16`,
+  WIN01 `1b961a52-e577-48f2-9e42-ba0a755f3e8b`,
+  SOAR01 `71cc7d65-2239-47ab-9696-51fa123d3cd2`.
+- **All VMs powered off; SOAR01 `nic2=nat` attached** (required for the VirusTotal call).
+- **Demo checklist:** `lab/runbook/demo-day.md`.
+- **Host note:** Windows hypervisor/VBS is ON (`HypervisorPresent=True`), so VirtualBox uses
+  NEM. This was not the cause (SOAR01 booted); do not change host settings for the demo.
