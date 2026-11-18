@@ -342,27 +342,35 @@ Soundbites to reuse:
 
 The demo is the same UC-13 chain shown on slides, but live. It is reliable only if rehearsed.
 
+**Where commands run:** `[HOST]` = Windows PowerShell on the presenting laptop; `[WIN01]` =
+PowerShell inside the Windows VM (visible window, or `guestcontrol` from the host);
+`[SOC01]`/`[SOAR01]` = shell in those VMs, reached with `plink`/SSH from the host. On the host
+use `curl.exe`, not `curl` (in PowerShell 5.1, `curl` is an alias for `Invoke-WebRequest`,
+which rejects `-k`).
+
 **Before the talk (pre-warm):**
 
-1. Power on SOAR01, attach NAT: `VBoxManage modifyvm SOAR01 --nic2 nat`.
-2. Power on S4: SOC01, then WIN01, then SOAR01. Wait for the WIN01 agent to be `Active`.
-3. Confirm the n8n workflow is published and the webhook is registered.
-4. On WIN01: disable Defender real-time protection for the demo window; confirm the DNS
-   cache is clean.
-5. Rehearse the query once, then **reboot WIN01** so the exact domain is not left in the
-   negative cache. The live run should be the first query after that reboot.
+1. `[HOST]` With SOAR01 off, attach NAT: `VBoxManage modifyvm SOAR01 --nic2 nat`.
+2. `[HOST]` Start SOC01, wait for the API, then WIN01 and SOAR01. Wait for the WIN01 agent to
+   be `Active`.
+3. `[HOST]` Confirm n8n is up and the webhook is registered (the workflow is published).
+4. `[WIN01]` Confirm the DNS cache is clean. Defender real-time can stay on (verified);
+   disable it only if the exact domain yields no Sysmon event.
+5. `[WIN01]` Rehearse the query once, then **reboot WIN01** `[HOST]` so the exact domain is
+   not left in the negative cache. The live run should be the first query after that reboot.
 6. Keep a pre-recorded clip of a successful run ready.
 
 **Live sequence (about 3 minutes):**
 
-1. Show the clean state: no incident file for the upcoming alert.
-2. On WIN01, elevated: `ipconfig /flushdns`, then `Resolve-DnsName -Type A malware.wicar.org`
-   (a timeout is expected).
-3. Switch to Wazuh Discover, filter `rule.id:100047`, show the alert and its fields.
-4. Show `/var/ossec/logs/integrations.log` with `HTTP:200`.
-5. On SOAR01, show the new incident JSON, `notifications/latest.json`, and the audit line.
-6. Run the benign control: `Resolve-DnsName -Type TXT example.com`; show that no 100047
-   alert appears.
+1. `[HOST]` Show the clean state: no incident file for the upcoming alert.
+2. `[WIN01]` Run `ipconfig /flushdns`, then `Resolve-DnsName -Type A malware.wicar.org`
+   (a timeout is expected; elevation not required).
+3. `[BROWSER]` Switch to Wazuh Discover, filter `rule.id:100047`, show the alert and its fields.
+4. `[HOST]` Show `/var/ossec/logs/integrations.log` with `HTTP:200` (executes on SOC01).
+5. `[HOST]` Show the new incident JSON, `notifications/latest.json`, and the audit line
+   (executes on SOAR01).
+6. `[WIN01]` Run the benign control: `Resolve-DnsName -Type TXT example.com`; show that no
+   100047 alert appears.
 
 **If anything fails:** play the recorded clip, narrate the same evidence, and move on. Known
 risks: VM boot time, DNS negative cache, Defender blocking the exact name, VirusTotal 404,
